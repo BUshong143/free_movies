@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
- 
+
 <nav>
   <div class="nav-left">
     <button class="hamburger" id="hbtn" onclick="toggleMenu()">
@@ -23,7 +23,6 @@
     <div class="nav-tab" data-page="anime" onclick="switchPage('anime')">Anime</div>
     <div class="nav-tab" data-page="tv" onclick="switchPage('tv')">TV Shows</div>
     <div class="nav-tab" data-page="movies" onclick="switchPage('movies')">Movies</div>
-    <div class="nav-tab ph-tab" data-page="ph" onclick="switchPage('ph')">🇵🇭 Pinoy</div>
   </div>
   <div class="nav-right">
     <div class="search-wrap">
@@ -32,7 +31,7 @@
     </div>
   </div>
 </nav>
- 
+
 <div id="bd" onclick="closeMenu()"></div>
 <aside id="sidebar">
   <div class="sb-scroll">
@@ -42,16 +41,6 @@
       <div class="sb-item" data-sid="anime" onclick="switchPage('anime');closeMenu()"><span class="sb-icon">⛩</span>Anime</div>
       <div class="sb-item" data-sid="tv" onclick="switchPage('tv');closeMenu()"><span class="sb-icon">▣</span>TV Shows</div>
       <div class="sb-item" data-sid="movies" onclick="switchPage('movies');closeMenu()"><span class="sb-icon">◉</span>Movies</div>
-      <div class="sb-item" data-sid="ph" onclick="switchPage('ph');closeMenu()"><span class="sb-icon">🇵🇭</span>Pinoy Films</div>
-    </div>
-    <div class="sb-section">
-      <div class="sb-label">Pinoy Genres</div>
-      <div class="sb-item" onclick="phGenre(28,'Action');closeMenu()"><span class="sb-icon">💥</span>Action</div>
-      <div class="sb-item" onclick="phGenre(35,'Comedy');closeMenu()"><span class="sb-icon">😄</span>Comedy</div>
-      <div class="sb-item" onclick="phGenre(18,'Drama');closeMenu()"><span class="sb-icon">🎭</span>Drama</div>
-      <div class="sb-item" onclick="phGenre(10749,'Romance');closeMenu()"><span class="sb-icon">❤️</span>Romance</div>
-      <div class="sb-item" onclick="phGenre(27,'Horror');closeMenu()"><span class="sb-icon">👻</span>Horror</div>
-      <div class="sb-item" onclick="phGenre(35,'Family');closeMenu()"><span class="sb-icon">👨‍👩‍👧</span>Family</div>
     </div>
     <div class="sb-section">
       <div class="sb-label">Movie Genres</div>
@@ -82,7 +71,7 @@
     Built by <strong>bossgreggy</strong>
   </div>
 </aside>
- 
+
 <!-- HERO -->
 <div id="hero">
   <div class="hero-left">
@@ -109,153 +98,191 @@
     <img id="himg" src="" alt="">
   </div>
 </div>
- 
+
 <!-- MAIN PAGES -->
 <div class="main">
- 
-  <!-- HOME -->
+
   <div class="page active" id="pg-home">
     <div class="genre-row" id="gpills"></div>
+
     <div class="sec">
-      <div class="sec-head"><h2 class="sec-title"><span class="sec-num">01</span>Trending This Week</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="r-trending"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
+      <div class="sec-head">
+        <h2 class="sec-title"><span class="sec-num">01</span>Trending This Week</h2>
+      </div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="r-trending"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
     </div>
+
     <div class="sec">
-      <div class="sec-head"><h2 class="sec-title"><span class="sec-num">02</span>Top Rated Movies</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="r-toprated"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
+      <div class="sec-head">
+        <h2 class="sec-title"><span class="sec-num">02</span>Top Rated Movies</h2>
+      </div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="r-toprated"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
     </div>
+
     <div class="sec">
-      <div class="sec-head"><h2 class="sec-title"><span class="sec-num">03</span>Now Playing in Cinemas</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="r-nowplaying"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
+      <div class="sec-head">
+        <h2 class="sec-title"><span class="sec-num">03</span>Now Playing in Cinemas</h2>
+      </div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="r-nowplaying"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
     </div>
+
     <div class="sec">
-      <div class="sec-head"><h2 class="sec-title"><span class="sec-num">04</span>Popular on TV</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="r-tvpop"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
+      <div class="sec-head">
+        <h2 class="sec-title"><span class="sec-num">04</span>Popular on TV</h2>
+      </div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="r-tvpop"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
     </div>
+
     <div class="sec">
-      <div class="sec-head"><h2 class="sec-title"><span class="sec-num">05</span>Top Anime This Season</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="r-anime"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
+      <div class="sec-head">
+        <h2 class="sec-title"><span class="sec-num">05</span>Top Anime This Season</h2>
+      </div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="r-anime"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
     </div>
-    <div class="sec">
-      <div class="sec-head"><h2 class="sec-title"><span class="sec-num ph">🇵🇭</span>Pinoy Picks</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="r-pinoy"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
-    </div>
+
     <div class="sec" id="xsec" style="display:none">
-      <div class="sec-head"><h2 class="sec-title" id="xtitle">Results</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="r-extra"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
+      <div class="sec-head">
+        <h2 class="sec-title" id="xtitle">Results</h2>
+      </div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="r-extra"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
     </div>
   </div>
- 
-  <!-- ANIME -->
+
   <div class="page" id="pg-anime">
     <div class="sec" style="padding-top:32px">
       <div class="sec-head"><h2 class="sec-title"><span class="sec-num">01</span>Top Airing Now</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="a-airing"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="a-airing"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
     </div>
     <div class="sec">
       <div class="sec-head"><h2 class="sec-title"><span class="sec-num">02</span>Most Popular</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="a-popular"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="a-popular"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
     </div>
     <div class="sec">
       <div class="sec-head"><h2 class="sec-title"><span class="sec-num">03</span>All-Time Top Rated</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="a-top"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="a-top"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
     </div>
     <div class="sec">
       <div class="sec-head"><h2 class="sec-title"><span class="sec-num">04</span>Upcoming</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="a-upcoming"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="a-upcoming"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
     </div>
     <div class="sec" id="ag-sec" style="display:none">
       <div class="sec-head"><h2 class="sec-title" id="ag-title">Genre</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="a-genre"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="a-genre"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
     </div>
   </div>
- 
-  <!-- TV -->
+
   <div class="page" id="pg-tv">
     <div class="sec" style="padding-top:32px">
       <div class="sec-head"><h2 class="sec-title"><span class="sec-num">01</span>Popular TV Shows</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="t-popular"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="t-popular"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
     </div>
     <div class="sec">
       <div class="sec-head"><h2 class="sec-title"><span class="sec-num">02</span>Top Rated</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="t-toprated"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="t-toprated"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
     </div>
     <div class="sec">
       <div class="sec-head"><h2 class="sec-title"><span class="sec-num">03</span>On Air Tonight</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="t-onair"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="t-onair"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
     </div>
   </div>
- 
-  <!-- MOVIES -->
+
   <div class="page" id="pg-movies">
     <div class="sec" style="padding-top:32px">
       <div class="sec-head"><h2 class="sec-title"><span class="sec-num">01</span>Trending Movies</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="m-trending"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="m-trending"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
     </div>
     <div class="sec">
       <div class="sec-head"><h2 class="sec-title"><span class="sec-num">02</span>Top Rated</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="m-toprated"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="m-toprated"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
     </div>
     <div class="sec">
       <div class="sec-head"><h2 class="sec-title"><span class="sec-num">03</span>Upcoming Releases</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="m-upcoming"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
-    </div>
-  </div>
- 
-  <!-- PINOY PAGE -->
-  <div class="page" id="pg-ph">
-    <div class="pg-ph-banner">
-      <div class="ph-flag">🇵🇭</div>
-      <div>
-        <div class="ph-banner-title">Pinoy Cinema</div>
-        <div class="ph-banner-sub">Discover Filipino films across all genres</div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="m-upcoming"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
       </div>
     </div>
-    <div class="genre-row" id="ph-pills"></div>
-    <div class="sec">
-      <div class="sec-head"><h2 class="sec-title"><span class="sec-num ph">01</span>Trending Filipino Films</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="ph-trending"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
-    </div>
-    <div class="sec">
-      <div class="sec-head"><h2 class="sec-title"><span class="sec-num ph">02</span>Top Rated Pinoy Movies</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="ph-toprated"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
-    </div>
-    <div class="sec">
-      <div class="sec-head"><h2 class="sec-title"><span class="sec-num ph">03</span>Action & Thriller</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="ph-action"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
-    </div>
-    <div class="sec">
-      <div class="sec-head"><h2 class="sec-title"><span class="sec-num ph">04</span>Romance & Drama</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="ph-romance"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
-    </div>
-    <div class="sec">
-      <div class="sec-head"><h2 class="sec-title"><span class="sec-num ph">05</span>Comedy</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="ph-comedy"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
-    </div>
-    <div class="sec">
-      <div class="sec-head"><h2 class="sec-title"><span class="sec-num ph">06</span>Horror</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="ph-horror"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
-    </div>
-    <div class="sec" id="ph-genre-sec" style="display:none">
-      <div class="sec-head"><h2 class="sec-title" id="ph-genre-title">Genre</h2></div>
-      <div class="car-wrap"><button class="car-btn lft" onclick="sc(this,-1)">‹</button><div class="car" id="ph-genre-car"></div><button class="car-btn rgt" onclick="sc(this,1)">›</button></div>
-    </div>
   </div>
- 
-</div>
- 
+
+</div><!-- /main -->
+
 <!-- SEARCH PAGE -->
 <div id="spage">
   <div class="s-head">Search results for: <span id="sq"></span></div>
   <div class="sgrid" id="sgrid"></div>
 </div>
- 
+
 <!-- FOOTER -->
 <footer class="site-footer">
   <span>© 2025 CINE·WAVE — All rights reserved</span>
   <span>Built by <strong>bossgreggy</strong> · Powered by TMDB &amp; Jikan</span>
 </footer>
- 
+
 <!-- MODAL -->
 <div id="moverlay" onclick="closeMBg(event)">
   <div class="modal">
@@ -271,8 +298,8 @@
     </div>
   </div>
 </div>
- 
-<!-- PLAYER — ad-blocking iframe sandbox -->
+
+<!-- PLAYER -->
 <div id="player">
   <div class="p-top">
     <button class="p-back" onclick="closePlayer()">←</button>
@@ -284,19 +311,14 @@
       <div class="spin-ring"></div>
       <div class="p-load-txt">Loading Stream…</div>
     </div>
-    <!-- sandbox blocks popups/new-tab ads; allow-scripts needed for players -->
-    <iframe id="pFrame"
-      sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-fullscreen"
-      allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-      referrerpolicy="no-referrer"
-    ></iframe>
+    <iframe id="pFrame" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" referrerpolicy="origin"></iframe>
   </div>
   <div class="p-bar">
-    <span class="p-hint">⚡ Video not loading? Try another source above.</span>
-    <a id="otab" href="#" target="_blank" rel="noopener noreferrer">Open in New Tab ↗</a>
+    <span>⚡ Video not loading? Try another source above.</span>
+    <a id="otab" href="#" target="_blank" rel="noopener">OPEN IN NEW TAB ↗</a>
   </div>
 </div>
- 
+
 <div id="toast"></div>
 <button id="totop" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
 <script src="script.js"></script>
