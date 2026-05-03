@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CineFy — Watch Together</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,300;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="watch-together.css">
+</head>
+<body>
+
+<nav>
+  <button class="hamburger" id="hbtn" onclick="toggleMenu()">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="logo" onclick="window.location.href='index.html'">
+    <span class="logo-c">Cine</span><span class="logo-dot"></span><span class="logo-w">Fy</span>
+  </div>
+  <div class="nav-right" style="margin-left:auto;">
+    <div class="wt-nav-badge">
+      <span class="wt-nav-dot"></span>
+      Watch Together
+    </div>
+  </div>
+</nav>
+
+<!-- LOBBY (shown when not in a room) -->
+<div id="lobby">
+  <div class="lobby-bg">
+    <div class="lb-orb lb-orb1"></div>
+    <div class="lb-orb lb-orb2"></div>
+    <div class="lb-orb lb-orb3"></div>
+  </div>
+  <div class="lobby-card">
+    <div class="lb-icon">🎬</div>
+    <h1 class="lb-title">Watch Together</h1>
+    <p class="lb-sub">Create a room and invite friends to watch the same movie at the same time — with live chat.</p>
+
+    <div class="lb-nick-wrap">
+      <label class="lb-label">Your Display Name</label>
+      <input class="lb-input" id="nickInput" type="text" placeholder="e.g. bossgreggy" maxlength="20" autocomplete="off">
+    </div>
+
+    <div class="lb-divider"><span>Choose an option</span></div>
+
+    <div class="lb-actions">
+      <button class="lb-btn-create" onclick="createRoom()">
+        <span class="lb-btn-icon">✦</span>
+        Create Room
+        <span class="lb-btn-sub">Get a room code to share</span>
+      </button>
+      <div class="lb-or">or</div>
+      <div class="lb-join-row">
+        <input class="lb-input lb-code-input" id="codeInput" type="text" placeholder="Enter room code…" maxlength="6" autocomplete="off" oninput="this.value=this.value.toUpperCase()">
+        <button class="lb-btn-join" onclick="joinRoom()">Join →</button>
+      </div>
+    </div>
+
+    <div class="lb-err" id="lbErr"></div>
+
+    <div class="lb-info">
+      <span>🔒 Rooms auto-close when everyone leaves</span>
+    </div>
+  </div>
+</div>
+
+<!-- ROOM VIEW -->
+<div id="roomView" style="display:none;">
+
+  <!-- Room top bar -->
+  <div class="room-bar">
+    <button class="room-leave" onclick="leaveRoom()">← Leave</button>
+    <div class="room-info">
+      <span class="room-title" id="roomMovieTitle">No title selected</span>
+      <span class="room-code-badge">Room: <strong id="roomCodeDisplay">——</strong></span>
+    </div>
+    <button class="room-copy" onclick="copyRoomCode()" title="Copy room code">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      Copy Code
+    </button>
+  </div>
+
+  <div class="room-layout">
+
+    <!-- LEFT: Player + Source Picker -->
+    <div class="room-player-col">
+
+      <!-- Source tabs inside room -->
+      <div class="room-src-bar" id="roomSrcBar" style="display:none;">
+        <span class="rsb-label">Sources:</span>
+        <div class="rsb-tabs" id="roomSrcTabs"></div>
+      </div>
+
+      <!-- Player frame -->
+      <div class="room-frame-wrap" id="roomFrameWrap">
+        <div class="room-placeholder" id="roomPlaceholder">
+          <div class="rp-icon">🎬</div>
+          <div class="rp-text">Waiting for host to pick a title…</div>
+          <div class="rp-sub" id="rpSubText"></div>
+        </div>
+        <div class="p-load" id="rpLoad" style="display:none;">
+          <div class="spin-ring"></div>
+          <div class="p-load-txt">Loading Stream…</div>
+        </div>
+        <iframe id="roomFrame" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowfullscreen referrerpolicy="origin" style="display:none;"></iframe>
+      </div>
+
+      <!-- Host controls -->
+      <div class="host-controls" id="hostControls" style="display:none;">
+        <div class="hc-label">🎮 You are the Host — pick a title to watch</div>
+        <div class="hc-search-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input type="text" id="hcSearch" placeholder="Search a movie, show, or anime…" autocomplete="off">
+        </div>
+        <div class="hc-results" id="hcResults"></div>
+      </div>
+
+      <!-- Viewer notice -->
+      <div class="viewer-notice" id="viewerNotice" style="display:none;">
+        <span>👁 You are a viewer — the host controls playback</span>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: Members + Chat -->
+    <div class="room-chat-col">
+
+      <!-- Members -->
+      <div class="chat-section members-section">
+        <div class="cs-head">
+          <span class="cs-title">Members</span>
+          <span class="member-count" id="memberCount">0</span>
+        </div>
+        <div class="members-list" id="membersList"></div>
+      </div>
+
+      <!-- Chat -->
+      <div class="chat-section chat-section-main">
+        <div class="cs-head">
+          <span class="cs-title">Live Chat</span>
+          <span class="chat-live-dot"></span>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+          <div class="chat-system">Welcome to the room! 👋</div>
+        </div>
+        <div class="chat-input-wrap">
+          <input class="chat-input" id="chatInput" type="text" placeholder="Say something…" maxlength="200" autocomplete="off">
+          <button class="chat-send" onclick="sendChat()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="watch-together.js"></script>
+</body>
+</html>
