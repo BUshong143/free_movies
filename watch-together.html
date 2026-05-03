@@ -53,7 +53,15 @@
 <div id="roomView" style="display:none;">
 
   <!-- Room top bar -->
+  
   <div class="room-bar">
+    <div class="nav-right" style="margin-left:auto;display:flex;align-items:center;gap:10px;">
+    <a class="wt-btn" href="index.html" title="Back to CineFy">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M19 12H5M12 5l-7 7 7 7"/>
+      </svg>
+    </a>
+  </div>
     <button class="room-leave" id="leaveBtn" style="margin-left:0;">Leave Room</button>
     <div class="room-info">
       <span class="room-title" id="roomMovieTitle">No title selected</span>
@@ -83,11 +91,6 @@
           <span id="syncStatusText">Synced</span>
         </div>
          <div class="nav-right" style="margin-left:auto;display:flex;align-items:center;gap:10px;">
-    <a class="wt-btn" href="index.html" title="Back to CineFy">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M19 12H5M12 5l-7 7 7 7"/>
-      </svg>
-    </a>
   </div>
         <div class="sync-controls">
           <button class="sync-btn" id="syncPlayBtn" title="Broadcast Play to all">
