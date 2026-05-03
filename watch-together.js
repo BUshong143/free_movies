@@ -6,8 +6,8 @@
 // ─────────────────────────────────────────
 //  🔧 REPLACE THESE WITH YOUR SUPABASE KEYS
 // ─────────────────────────────────────────
-const SUPABASE_URL  = 'YOUR_SUPABASE_URL';       // e.g. https://xyzabc.supabase.co
-const SUPABASE_ANON = 'YOUR_SUPABASE_ANON_KEY';  // your public anon key
+const SUPABASE_URL  = 'eqlfwukjidnrwcgfnzjo';       // e.g. https://xyzabc.supabase.co
+const SUPABASE_ANON = 'sb_publishable_oDSsGiLkQdszdkY-CcJarw_p7qg_rWa';  // your public anon key
 // ─────────────────────────────────────────
 
 const { createClient } = supabase;
