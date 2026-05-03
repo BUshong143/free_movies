@@ -1,45 +1,68 @@
 // ══════════════════════════════════════════════════
 //  CineFy — Watch Together  (watch-together.js)
-//  Uses Supabase Realtime for live room sync + chat
+//  Real-time sync via Supabase Realtime
+//  Features: play/pause sync, host transfer,
+//  mobile chat drawer, error handling
 // ══════════════════════════════════════════════════
 
-// ─────────────────────────────────────────
-//  🔧 REPLACE THESE WITH YOUR SUPABASE KEYS
-// ─────────────────────────────────────────
-const SUPABASE_URL  = 'https://eqlfwukjidnrwcgfnzjo.supabase.co';       // e.g. https://xyzabc.supabase.co
-const SUPABASE_ANON = 'sb_publishable_oDSsGiLkQdszdkY-CcJarw_p7qg_rWa';  // your public anon key
-// ─────────────────────────────────────────
+const SUPABASE_URL  = 'https://eqlfwukjidnrwcgfnzjo.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_oDSsGiLkQdszdkY-CcJarw_p7qg_rWa';
 
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-// TMDB + Jikan (reuse from main app)
-const TKEY   = '8265bd1679663a7ea12ac168da84d2e8';
-const TB     = 'https://api.themoviedb.org/3';
-const IBASE  = 'https://image.tmdb.org/t/p/';
-const JB     = 'https://api.jikan.moe/v4';
+// TMDB + Jikan
+const TKEY  = '8265bd1679663a7ea12ac168da84d2e8';
+const TB    = 'https://api.themoviedb.org/3';
+const IBASE = 'https://image.tmdb.org/t/p/';
+const JB    = 'https://api.jikan.moe/v4';
+
+// Source list — single source of truth
+const SOURCES = [
+  { n: 'VidSrc',    base: 'https://vidsrc.xyz/embed' },
+  { n: 'VidSrc.to', base: 'https://vidsrc.to/embed' },
+  { n: 'Embed.su',  base: 'https://embed.su/embed' },
+  { n: 'AutoEmbed', base: 'https://autoembed.co/embed' },
+  { n: 'Smashy',    base: 'https://player.smashy.stream' },
+];
 
 // App state
-let myNick    = '';
-let myUserId  = crypto.randomUUID();
-let roomCode  = '';
-let isHost    = false;
-let channel   = null;   // Supabase realtime channel
-let members   = {};     // { userId: { nick, isHost } }
-let currentSrcs = [];   // current source list
-let hcTimer   = null;
+let myNick     = '';
+let myUserId   = crypto.randomUUID();
+let roomCode   = '';
+let isHost     = false;
+let channel    = null;
+let members    = {};        // { userId: { nick, isHost } }
+let currentSrcs = [];
+let hcTimer    = null;
+let unreadCount = 0;        // mobile unread badge
+let chatDrawerOpen = false;
+let isMobile   = () => window.innerWidth <= 768;
 
-// ── Embed sources (same logic as main app) ──
+// ── UTILITIES ──
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+async function tmdbFetch(p, x = '') {
+  return (await fetch(`${TB}${p}?api_key=${TKEY}${x}`)).json();
+}
+
 function getSrc(id, type) {
   const t = type === 'tv' ? 'tv' : 'movie';
-  return [
-    { n: 'VidSrc',    u: `https://vidsrc.xyz/embed/${t}/${id}` },
-    { n: 'VidSrc.to', u: `https://vidsrc.to/embed/${t}/${id}` },
-    { n: 'Embed.su',  u: `https://embed.su/embed/${t}/${id}` },
-    { n: 'AutoEmbed', u: `https://autoembed.co/embed/${t}/${id}` },
-    { n: 'Smashy',    u: `https://player.smashy.stream/${t}/${id}` },
-  ];
+  return SOURCES.map(s => ({ n: s.n, u: `${s.base}/${t}/${id}` }));
 }
+
 async function getAnimeEmbedSrcs(malId, animeTitle) {
   try {
     const s = await tmdbFetch('/search/tv', `&query=${encodeURIComponent(animeTitle)}`);
@@ -51,34 +74,18 @@ async function getAnimeEmbedSrcs(malId, animeTitle) {
   } catch(e) {}
   const enc = encodeURIComponent(animeTitle);
   return [
-    { n: 'VidSrc',     u: `https://vidsrc.xyz/embed/tv/${malId}` },
-    { n: 'Gogoanime',  u: `https://gogoanime3.co/search.html?keyword=${enc}` },
-    { n: 'Animepahe',  u: `https://animepahe.ru/search?q=${enc}` },
-    { n: '9anime',     u: `https://9anime.gs/search?keyword=${enc}` },
-    { n: 'Zoro.to',    u: `https://hianime.to/search?keyword=${enc}` },
+    { n: 'VidSrc',    u: `https://vidsrc.xyz/embed/tv/${malId}` },
+    { n: 'Gogoanime', u: `https://gogoanime3.co/search.html?keyword=${enc}` },
+    { n: 'Animepahe', u: `https://animepahe.ru/search?q=${enc}` },
+    { n: '9anime',    u: `https://9anime.gs/search?keyword=${enc}` },
+    { n: 'Zoro.to',   u: `https://hianime.to/search?keyword=${enc}` },
   ];
-}
-async function tmdbFetch(p, x = '') {
-  return (await fetch(`${TB}${p}?api_key=${TKEY}${x}`)).json();
-}
-function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-// ── TOAST ──
-function toast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(t._t);
-  t._t = setTimeout(() => t.classList.remove('show'), 3200);
 }
 
 // ── LOBBY ──
 function setLobbyErr(msg) {
   document.getElementById('lbErr').textContent = msg;
 }
-
 function getNick() {
   const v = document.getElementById('nickInput').value.trim();
   if (!v) { setLobbyErr('Please enter a display name first.'); return null; }
@@ -86,31 +93,33 @@ function getNick() {
   setLobbyErr('');
   return v;
 }
-
 function genCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
-async function createRoom() {
+document.getElementById('createRoomBtn').addEventListener('click', async () => {
   const nick = getNick();
   if (!nick) return;
-  myNick = nick;
-  isHost = true;
-  roomCode = genCode();
+  myNick = nick; isHost = true; roomCode = genCode();
   await enterRoom();
-}
+});
 
-async function joinRoom() {
+document.getElementById('joinRoomBtn').addEventListener('click', async () => {
   const nick = getNick();
   if (!nick) return;
   const code = document.getElementById('codeInput').value.trim().toUpperCase();
   if (code.length !== 6) { setLobbyErr('Room code must be 6 characters.'); return; }
-  myNick = nick;
-  isHost = false;
-  roomCode = code;
+  myNick = nick; isHost = false; roomCode = code;
   await enterRoom();
-}
+});
+
+document.getElementById('codeInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('joinRoomBtn').click();
+});
+document.getElementById('nickInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('createRoomBtn').click();
+});
 
 // ── ENTER ROOM ──
 async function enterRoom() {
@@ -118,123 +127,207 @@ async function enterRoom() {
   document.getElementById('roomView').style.display = 'flex';
   document.getElementById('roomCodeDisplay').textContent = roomCode;
 
-  // Set up member record
   members[myUserId] = { nick: myNick, isHost };
 
-  // Subscribe to Supabase Realtime channel for this room
   channel = sb.channel(`cinefy-room-${roomCode}`, {
     config: { presence: { key: myUserId } }
   });
 
-  // Presence: someone joins/leaves
+  // Presence sync
   channel.on('presence', { event: 'sync' }, () => {
     const state = channel.presenceState();
+    const prevMembers = { ...members };
     members = {};
     Object.values(state).forEach(presences => {
       presences.forEach(p => {
         members[p.userId] = { nick: p.nick, isHost: p.isHost };
       });
     });
+
+    // Host transfer: if old host left and I'm first non-host, become host
+    const wasHost = Object.entries(prevMembers).find(([,m]) => m.isHost)?.[0];
+    const stillHere = Object.keys(members).includes(wasHost);
+    if (!stillHere && !isHost) {
+      const sorted = Object.keys(members).sort();
+      if (sorted[0] === myUserId) {
+        isHost = true;
+        members[myUserId].isHost = true;
+        channel.track({ userId: myUserId, nick: myNick, isHost: true });
+        showHostControls();
+        addSystemMsg('You became the new host 👑');
+        toast('You are now the host 👑');
+      }
+    }
+
     renderMembers();
   });
 
-  channel.on('presence', { event: 'join' }, ({ key, newPresences }) => {
+  channel.on('presence', { event: 'join' }, ({ newPresences }) => {
     newPresences.forEach(p => {
-      if (p.userId !== myUserId) {
-        addSystemMsg(`${p.nick} joined the room 👋`);
-      }
+      if (p.userId !== myUserId) addSystemMsg(`${p.nick} joined the room 👋`);
     });
   });
 
-  channel.on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+  channel.on('presence', { event: 'leave' }, ({ leftPresences }) => {
     leftPresences.forEach(p => {
       addSystemMsg(`${p.nick} left the room`);
     });
   });
 
-  // Broadcast: receive events from others
+  // Chat
   channel.on('broadcast', { event: 'chat' }, ({ payload }) => {
     appendChat(payload.nick, payload.text, payload.ts, payload.userId === myUserId);
+    // Mobile badge
+    if (isMobile() && !chatDrawerOpen) {
+      unreadCount++;
+      updateBadge();
+    }
   });
 
+  // Title sync
   channel.on('broadcast', { event: 'play_title' }, ({ payload }) => {
-    if (!isHost) {
-      // Non-host receives the title to play
-      receivePlayTitle(payload);
-    }
+    if (!isHost) receivePlayTitle(payload);
   });
 
+  // Source change sync
   channel.on('broadcast', { event: 'change_source' }, ({ payload }) => {
-    if (!isHost) {
-      loadRoomSrc(payload.idx, payload.srcs);
-    }
+    if (!isHost) loadRoomSrc(payload.idx, payload.srcs);
   });
 
-  // Subscribe and track presence
-  await channel.subscribe(async (status) => {
-    if (status === 'SUBSCRIBED') {
-      await channel.track({
-        userId: myUserId,
-        nick:   myNick,
-        isHost: isHost,
-      });
+  // ── PLAY/PAUSE SYNC — any member can broadcast ──
+  channel.on('broadcast', { event: 'playback_cmd' }, ({ payload }) => {
+    const { cmd, senderNick, senderId } = payload;
+    if (senderId === myUserId) return; // ignore own events
+    applyPlaybackCmd(cmd, senderNick);
+  });
 
+  // Subscribe with error handling
+  await channel.subscribe(async (status, err) => {
+    if (status === 'SUBSCRIBED') {
+      await channel.track({ userId: myUserId, nick: myNick, isHost });
       if (isHost) {
         showHostControls();
-        addSystemMsg('You created this room. Share code: ' + roomCode);
+        addSystemMsg(`You created this room. Share code: ${roomCode}`);
       } else {
         showViewerNotice();
-        addSystemMsg('You joined room ' + roomCode);
+        addSystemMsg(`You joined room ${roomCode}`);
       }
+      setupSyncBar();
+    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+      toast('Connection failed. Check your room code or network. ❌');
+      console.error('Supabase channel error:', err);
+      leaveRoom();
+    } else if (status === 'CLOSED') {
+      toast('Disconnected from room.');
     }
-  });
-
-  // Chat enter key
-  document.getElementById('chatInput').addEventListener('keydown', e => {
-    if (e.key === 'Enter') sendChat();
   });
 }
 
+// ── SYNC BAR SETUP (play/pause buttons) ──
+function setupSyncBar() {
+  document.getElementById('syncPlayBtn').addEventListener('click', () => {
+    broadcastPlaybackCmd('play');
+    applyPlaybackCmd('play', myNick + ' (you)');
+  });
+  document.getElementById('syncPauseBtn').addEventListener('click', () => {
+    broadcastPlaybackCmd('pause');
+    applyPlaybackCmd('pause', myNick + ' (you)');
+  });
+}
+
+function broadcastPlaybackCmd(cmd) {
+  if (!channel) return;
+  channel.send({
+    type: 'broadcast',
+    event: 'playback_cmd',
+    payload: { cmd, senderNick: myNick, senderId: myUserId }
+  });
+}
+
+// Apply play/pause to the iframe by reloading src (postMessage approach where possible)
+function applyPlaybackCmd(cmd, senderNick) {
+  const frame = document.getElementById('roomFrame');
+  if (!frame || frame.style.display === 'none') return;
+
+  // Try postMessage to player (works with some embeds)
+  try {
+    frame.contentWindow.postMessage({ action: cmd }, '*');
+  } catch(e) {}
+
+  // Visual feedback in sync status
+  const statusText = document.getElementById('syncStatusText');
+  if (statusText) {
+    statusText.textContent = cmd === 'play'
+      ? `▶ Playing (${senderNick})`
+      : `⏸ Paused (${senderNick})`;
+    setTimeout(() => { statusText.textContent = 'Synced'; }, 4000);
+  }
+
+  // Add sync event to both chat panels
+  addSyncEventMsg(cmd === 'play'
+    ? `▶ ${senderNick} sent Play signal`
+    : `⏸ ${senderNick} sent Pause signal`
+  );
+
+  toast(cmd === 'play' ? `▶ ${senderNick} pressed Play` : `⏸ ${senderNick} pressed Pause`);
+}
+
+function addSyncEventMsg(text) {
+  [document.getElementById('chatMessages'), document.getElementById('chatMessagesMobile')].forEach(box => {
+    if (!box) return;
+    const div = document.createElement('div');
+    div.className = 'chat-sync-event';
+    div.textContent = text;
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+  });
+}
+
+// ── LEAVE ROOM ──
+document.getElementById('leaveBtn').addEventListener('click', leaveRoom);
+
 function leaveRoom() {
   if (channel) channel.unsubscribe();
-  channel = null;
-  members = {};
-  currentSrcs = [];
-  roomCode = '';
-  isHost = false;
+  channel = null; members = {}; currentSrcs = [];
+  roomCode = ''; isHost = false; unreadCount = 0;
 
-  // Reset UI
   document.getElementById('roomFrame').src = '';
   document.getElementById('roomFrame').style.display = 'none';
   document.getElementById('roomPlaceholder').style.display = 'flex';
   document.getElementById('rpSubText').textContent = '';
   document.getElementById('roomSrcBar').style.display = 'none';
+  document.getElementById('syncBar').style.display = 'none';
   document.getElementById('roomSrcTabs').innerHTML = '';
   document.getElementById('roomMovieTitle').textContent = 'No title selected';
   document.getElementById('chatMessages').innerHTML = '<div class="chat-system">Welcome to the room! 👋</div>';
+  document.getElementById('chatMessagesMobile').innerHTML = '<div class="chat-system">Welcome to the room! 👋</div>';
   document.getElementById('membersList').innerHTML = '';
+  document.getElementById('membersListMobile').innerHTML = '';
   document.getElementById('hcResults').innerHTML = '';
   document.getElementById('hcSearch').value = '';
-  document.getElementById('hostControls').style.display  = 'none';
-  document.getElementById('viewerNotice').style.display  = 'none';
+  document.getElementById('hostControls').style.display = 'none';
+  document.getElementById('viewerNotice').style.display = 'none';
+  updateBadge();
+  closeChatDrawer();
 
   document.getElementById('roomView').style.display = 'none';
-  document.getElementById('lobby').style.display = 'flex';
+  document.getElementById('lobby').style.display    = 'flex';
 }
 
-function copyRoomCode() {
+document.getElementById('copyCodeBtn').addEventListener('click', () => {
   if (!roomCode) return;
-  navigator.clipboard.writeText(roomCode).then(() => toast('Room code copied! 📋'));
-}
+  navigator.clipboard.writeText(roomCode)
+    .then(() => toast('Room code copied! 📋'))
+    .catch(() => toast('Code: ' + roomCode));
+});
 
-// ── MEMBER LIST ──
+// ── MEMBERS ──
 function renderMembers() {
-  const list = document.getElementById('membersList');
-  const count = document.getElementById('memberCount');
   const arr = Object.entries(members);
-  count.textContent = arr.length;
-  list.innerHTML = arr.map(([uid, m]) => {
-    const initial = (m.nick||'?')[0].toUpperCase();
+  document.getElementById('memberCount').textContent = arr.length;
+
+  const html = arr.map(([uid, m]) => {
+    const initial = (m.nick || '?')[0].toUpperCase();
     const isMe = uid === myUserId;
     return `<div class="member-item">
       <div class="member-avatar">${initial}</div>
@@ -242,49 +335,112 @@ function renderMembers() {
       ${m.isHost ? '<span class="member-host-badge">HOST</span>' : ''}
     </div>`;
   }).join('');
+
+  document.getElementById('membersList').innerHTML = html;
+  document.getElementById('membersListMobile').innerHTML = html;
 }
 
 // ── CHAT ──
-function sendChat() {
-  const input = document.getElementById('chatInput');
+function sendChat(inputId) {
+  const input = document.getElementById(inputId);
   const text = input.value.trim();
   if (!text || !channel) return;
   const ts = Date.now();
-  // Broadcast to others
   channel.send({ type: 'broadcast', event: 'chat', payload: { nick: myNick, text, ts, userId: myUserId } });
-  // Show locally
   appendChat(myNick, text, ts, true);
   input.value = '';
 }
 
+// Wire up both send buttons
+document.getElementById('chatSendBtn').addEventListener('click', () => sendChat('chatInput'));
+document.getElementById('chatSendMobile').addEventListener('click', () => sendChat('chatInputMobile'));
+
+document.getElementById('chatInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendChat('chatInput');
+});
+document.getElementById('chatInputMobile').addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendChat('chatInputMobile');
+});
+
 function appendChat(nick, text, ts, isMe) {
-  const box = document.getElementById('chatMessages');
   const time = new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const div = document.createElement('div');
-  div.className = 'chat-msg';
-  div.innerHTML = `
+  const html = `<div class="chat-msg">
     <div class="chat-msg-header">
       <span class="chat-msg-nick${isMe ? ' is-me' : ''}">${esc(nick)}</span>
       <span class="chat-msg-time">${time}</span>
     </div>
-    <div class="chat-msg-text">${esc(text)}</div>`;
-  box.appendChild(div);
-  box.scrollTop = box.scrollHeight;
+    <div class="chat-msg-text">${esc(text)}</div>
+  </div>`;
+
+  // Append to both panels
+  [document.getElementById('chatMessages'), document.getElementById('chatMessagesMobile')].forEach(box => {
+    if (!box) return;
+    box.insertAdjacentHTML('beforeend', html);
+    box.scrollTop = box.scrollHeight;
+  });
 }
 
 function addSystemMsg(msg) {
-  const box = document.getElementById('chatMessages');
-  const div = document.createElement('div');
-  div.className = 'chat-system';
-  div.textContent = msg;
-  box.appendChild(div);
-  box.scrollTop = box.scrollHeight;
+  const html = `<div class="chat-system">${esc(msg)}</div>`;
+  [document.getElementById('chatMessages'), document.getElementById('chatMessagesMobile')].forEach(box => {
+    if (!box) return;
+    box.insertAdjacentHTML('beforeend', html);
+    box.scrollTop = box.scrollHeight;
+  });
 }
+
+// ── MOBILE CHAT DRAWER ──
+function openChatDrawer() {
+  chatDrawerOpen = true;
+  unreadCount = 0;
+  updateBadge();
+  document.getElementById('chatDrawer').classList.add('open');
+  document.getElementById('drawerOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  // Scroll to bottom
+  setTimeout(() => {
+    const m = document.getElementById('chatMessagesMobile');
+    if (m) m.scrollTop = m.scrollHeight;
+  }, 100);
+}
+
+function closeChatDrawer() {
+  chatDrawerOpen = false;
+  document.getElementById('chatDrawer').classList.remove('open');
+  document.getElementById('drawerOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function updateBadge() {
+  const badge = document.getElementById('fabBadge');
+  if (!badge) return;
+  if (unreadCount > 0) {
+    badge.style.display = 'flex';
+    badge.textContent = unreadCount > 9 ? '9+' : unreadCount;
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+document.getElementById('fabChat').addEventListener('click', openChatDrawer);
+document.getElementById('drawerClose').addEventListener('click', closeChatDrawer);
+document.getElementById('drawerOverlay').addEventListener('click', closeChatDrawer);
+
+// Swipe down to close drawer
+let touchStartY = 0;
+document.getElementById('drawerHandle').addEventListener('touchstart', e => {
+  touchStartY = e.touches[0].clientY;
+}, { passive: true });
+document.getElementById('drawerHandle').addEventListener('touchend', e => {
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  if (dy > 60) closeChatDrawer();
+}, { passive: true });
 
 // ── HOST: SEARCH & PICK TITLE ──
 function showHostControls() {
   document.getElementById('hostControls').style.display = 'block';
   document.getElementById('viewerNotice').style.display = 'none';
+  document.getElementById('syncBar').style.display = 'flex';
 
   document.getElementById('hcSearch').addEventListener('input', e => {
     clearTimeout(hcTimer);
@@ -297,52 +453,62 @@ function showHostControls() {
 function showViewerNotice() {
   document.getElementById('viewerNotice').style.display = 'block';
   document.getElementById('hostControls').style.display = 'none';
+  // Non-hosts can still see sync bar to send play/pause
+  document.getElementById('syncBar').style.display = 'flex';
 }
 
 async function hostSearch(q) {
   const res = document.getElementById('hcResults');
   res.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 0">Searching…</div>';
+  try {
+    const [mr, ar] = await Promise.all([
+      tmdbFetch('/search/multi', `&query=${encodeURIComponent(q)}`),
+      fetch(`${JB}/anime?q=${encodeURIComponent(q)}&limit=5`).then(r => r.json()).catch(() => ({ data: [] }))
+    ]);
+    const tmdbItems = (mr.results || []).filter(m => m.media_type === 'movie' || m.media_type === 'tv').slice(0, 8);
+    const animeItems = (ar.data || []).slice(0, 4);
 
-  const [mr, ar] = await Promise.all([
-    tmdbFetch('/search/multi', `&query=${encodeURIComponent(q)}`),
-    fetch(`${JB}/anime?q=${encodeURIComponent(q)}&limit=5`).then(r=>r.json()).catch(()=>({data:[]}))
-  ]);
+    if (!tmdbItems.length && !animeItems.length) {
+      res.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 0">No results.</div>';
+      return;
+    }
 
-  const tmdbItems = (mr.results || []).filter(m => m.media_type === 'movie' || m.media_type === 'tv').slice(0, 8);
-  const animeItems = (ar.data || []).slice(0, 4);
+    res.innerHTML = [
+      ...tmdbItems.map(m => {
+        const t = m.title || m.name || '?';
+        const img = m.poster_path
+          ? `<img src="${IBASE}w92${m.poster_path}" alt="${esc(t)}" loading="lazy">`
+          : `<div class="hc-card-np">🎬</div>`;
+        const tp = m.media_type || 'movie';
+        return `<div class="hc-card" data-id="${m.id}" data-type="${tp}" data-title="${esc(t)}">
+          ${img}
+          <div class="hc-card-badge">${tp === 'tv' ? 'TV' : '🎬'}</div>
+          <div class="hc-card-title">${esc(t)}</div>
+        </div>`;
+      }),
+      ...animeItems.map(a => {
+        const t = a.title_english || a.title || '?';
+        const img = a.images?.jpg?.image_url
+          ? `<img src="${a.images.jpg.image_url}" alt="${esc(t)}" loading="lazy">`
+          : `<div class="hc-card-np">⛩️</div>`;
+        return `<div class="hc-card" data-mal="${a.mal_id}" data-title="${esc(t)}">
+          ${img}
+          <div class="hc-card-badge">ANI</div>
+          <div class="hc-card-title">${esc(t)}</div>
+        </div>`;
+      })
+    ].join('');
 
-  if (!tmdbItems.length && !animeItems.length) {
-    res.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 0">No results.</div>';
-    return;
+    // Attach click events — no inline onclick
+    res.querySelectorAll('.hc-card[data-id]').forEach(card => {
+      card.addEventListener('click', () => hostPickTMDB(card.dataset.id, card.dataset.type, card.dataset.title));
+    });
+    res.querySelectorAll('.hc-card[data-mal]').forEach(card => {
+      card.addEventListener('click', () => hostPickAnime(card.dataset.mal, card.dataset.title));
+    });
+  } catch(e) {
+    res.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 0">Search failed.</div>';
   }
-
-  const tmdbCards = tmdbItems.map(m => {
-    const t = m.title || m.name || '?';
-    const img = m.poster_path
-      ? `<img src="${IBASE}w92${m.poster_path}" alt="${esc(t)}" decoding="async">`
-      : `<div class="hc-card-np">🎬</div>`;
-    const tp = m.media_type || 'movie';
-    return `<div class="hc-card" onclick="hostPickTMDB(${m.id},'${tp}','${esc(t).replace(/'/g,"\\'")}')">
-      ${img}
-      <div class="hc-card-badge">${tp==='tv'?'TV':'🎬'}</div>
-      <div class="hc-card-title">${esc(t)}</div>
-    </div>`;
-  });
-
-  const animeCards = animeItems.map(a => {
-    const t = a.title_english || a.title || '?';
-    const img = a.images?.jpg?.image_url
-      ? `<img src="${a.images.jpg.image_url}" alt="${esc(t)}" decoding="async">`
-      : `<div class="hc-card-np">⛩️</div>`;
-    const safeT = esc(t).replace(/'/g,"\\'");
-    return `<div class="hc-card" onclick="hostPickAnime(${a.mal_id},'${safeT}')">
-      ${img}
-      <div class="hc-card-badge">ANI</div>
-      <div class="hc-card-title">${esc(t)}</div>
-    </div>`;
-  });
-
-  res.innerHTML = [...tmdbCards, ...animeCards].join('');
 }
 
 async function hostPickTMDB(id, type, title) {
@@ -357,28 +523,29 @@ async function hostPickAnime(malId, title) {
 }
 
 function broadcastAndPlay(payload) {
-  // Tell all viewers
   channel.send({ type: 'broadcast', event: 'play_title', payload });
-  // Play locally for host too
   loadPlayTitle(payload);
   toast(`Now playing: ${payload.title} 🎬`);
 }
 
-// ── PLAY TITLE (host + viewers) ──
+// ── PLAYBACK ──
 function loadPlayTitle(payload) {
   const { title, srcs } = payload;
   currentSrcs = srcs;
-
   document.getElementById('roomMovieTitle').textContent = title;
   document.getElementById('roomPlaceholder').style.display = 'none';
 
-  // Show source bar
-  const srcBar  = document.getElementById('roomSrcBar');
+  const srcBar = document.getElementById('roomSrcBar');
   const srcTabs = document.getElementById('roomSrcTabs');
   srcBar.style.display = 'flex';
-  srcTabs.innerHTML = srcs.map((s, i) =>
-    `<button class="s-tab ${i===0?'active':''}" onclick="switchRoomSrc(${i})">${s.n}</button>`
-  ).join('');
+  srcTabs.innerHTML = '';
+  srcs.forEach((s, i) => {
+    const btn = document.createElement('button');
+    btn.className = `s-tab${i === 0 ? ' active' : ''}`;
+    btn.textContent = s.n;
+    btn.addEventListener('click', () => switchRoomSrc(i));
+    srcTabs.appendChild(btn);
+  });
 
   loadRoomSrcByIdx(0);
 }
@@ -391,7 +558,6 @@ function receivePlayTitle(payload) {
 
 function switchRoomSrc(idx) {
   loadRoomSrcByIdx(idx);
-  // If host, broadcast source change
   if (isHost && channel) {
     channel.send({ type: 'broadcast', event: 'change_source', payload: { idx, srcs: currentSrcs } });
   }
@@ -400,9 +566,14 @@ function switchRoomSrc(idx) {
 function loadRoomSrc(idx, srcs) {
   currentSrcs = srcs;
   const srcTabs = document.getElementById('roomSrcTabs');
-  srcTabs.innerHTML = srcs.map((s, i) =>
-    `<button class="s-tab ${i===idx?'active':''}" onclick="switchRoomSrc(${i})">${s.n}</button>`
-  ).join('');
+  srcTabs.innerHTML = '';
+  srcs.forEach((s, i) => {
+    const btn = document.createElement('button');
+    btn.className = `s-tab${i === idx ? ' active' : ''}`;
+    btn.textContent = s.n;
+    btn.addEventListener('click', () => switchRoomSrc(i));
+    srcTabs.appendChild(btn);
+  });
   loadRoomSrcByIdx(idx);
 }
 
@@ -431,8 +602,7 @@ function loadRoomSrcByIdx(idx) {
   toast(`Loading ${s.n}… 🎬`);
 }
 
-// ── INIT ──
-// Check for ?room=XXXXXX in URL (for share links)
+// ── INIT: URL room code ──
 (function checkURLRoom() {
   const params = new URLSearchParams(window.location.search);
   const code = params.get('room');
@@ -440,3 +610,7 @@ function loadRoomSrcByIdx(idx) {
     document.getElementById('codeInput').value = code.toUpperCase();
   }
 })();
+
+// Hamburger nav (shared with main app)
+const hbtn = document.getElementById('hbtn');
+if (hbtn) hbtn.addEventListener('click', () => hbtn.classList.toggle('open'));
