@@ -280,13 +280,19 @@ async function openDetail(id,type){
       ${(d.genres||[]).map(g=>`<span class="tag g">${esc(g.name)}</span>`).join('')}
       ${d.status?`<span class="tag">${esc(d.status)}</span>`:''}`;
 
-    // Safe button — use data attributes, attach listener after render
+    // ── BUTTONS: Watch Now + Watch Together + Watchlist ──
     const inWl=watchlist.some(w=>w.id==id&&w.type===type);
     document.getElementById('macts').innerHTML=`
       <button class="btn-play" id="modal-watch-btn">▶&nbsp; Watch Now</button>
+      <button class="btn-wt" id="modal-wt-btn">👥&nbsp; Watch Together</button>
       <button class="btn-info" id="modal-wl-btn">${inWl?'✓ Watchlisted':'+ Watchlist'}</button>`;
+
     document.getElementById('modal-watch-btn').addEventListener('click',()=>{
       closeM();launch(id,type,title);
+    });
+    document.getElementById('modal-wt-btn').addEventListener('click',()=>{
+      closeM();
+      window.location.href=`watch-together.html?autotitle=${encodeURIComponent(title)}&autoid=${id}&autotype=${type}`;
     });
     document.getElementById('modal-wl-btn').addEventListener('click',()=>toggleWatchlist(id,type,title));
   }catch(e){document.getElementById('mtitle').textContent='Failed to load.';}
