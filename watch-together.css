@@ -1,7 +1,13 @@
 /* ══════════════════════════════════════════
    WATCH TOGETHER — watch-together.css
    Fully responsive for all devices
+   Fix: no auto-zoom on input focus (iOS)
 ══════════════════════════════════════════ */
+
+/* ── PREVENT IOS AUTO-ZOOM ON ALL INPUTS ── */
+input, textarea, select {
+  font-size: 16px !important;
+}
 
 /* Nav badge */
 .wt-nav-badge {
@@ -84,7 +90,7 @@
   padding: 12px 16px;
   color: var(--text);
   font-family: 'Poppins', sans-serif;
-  font-size: 13px;
+  font-size: 16px !important;
   outline: none;
   transition: border-color 0.2s, background 0.2s;
 }
@@ -115,7 +121,14 @@
 .lb-btn-sub { font-size: 10px; font-weight: 500; opacity: 0.6; margin-left: auto; }
 .lb-or { text-align: center; font-size: 11px; color: var(--muted); font-weight: 500; }
 .lb-join-row { display: flex; gap: 8px; }
-.lb-code-input { flex: 1; text-align: center; font-size: 14px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; }
+.lb-code-input {
+  flex: 1;
+  text-align: center;
+  font-size: 16px !important;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
 .lb-btn-join {
   background: rgba(255,255,255,0.1);
   border: 1px solid var(--border2);
@@ -153,6 +166,7 @@
   font-size: 12px; font-weight: 600;
   border-radius: 10px; padding: 6px 14px;
   cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  text-decoration: none; display: inline-flex; align-items: center;
 }
 .room-leave:hover { background: rgba(255,80,80,0.15); border-color: rgba(255,80,80,0.4); color: #ff6b6b; }
 .room-info { flex: 1; display: flex; align-items: center; gap: 10px; overflow: hidden; min-width: 0; }
@@ -267,7 +281,8 @@
 .hc-search-wrap input {
   flex: 1; background: none; border: none; outline: none;
   color: var(--text);
-  font-family: 'Poppins', sans-serif; font-size: 13px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 16px !important;
 }
 .hc-search-wrap input::placeholder { color: var(--muted); }
 .hc-results {
@@ -411,7 +426,8 @@
   border: 1px solid var(--border);
   border-radius: 10px; padding: 9px 12px;
   color: var(--text);
-  font-family: 'Poppins', sans-serif; font-size: 12.5px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 16px !important;
   outline: none; transition: border-color 0.2s;
 }
 .chat-input:focus { border-color: var(--accent); }
@@ -538,6 +554,33 @@
   padding: 10px 14px 20px;
   border-top: 1px solid var(--border); flex-shrink: 0;
   background: rgba(17,17,24,0.98);
+}
+
+/* ── RECONNECTING BANNER ── */
+.reconnect-banner {
+  position: fixed;
+  top: var(--nav-h);
+  left: 0; right: 0;
+  z-index: 2000;
+  background: rgba(255, 107, 53, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 10px 20px;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  font-size: 13px; font-weight: 600; color: #fff;
+  animation: slideDown 0.3s ease;
+}
+@keyframes slideDown {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(0); }
+}
+.reconnect-spinner {
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: rot 0.7s linear infinite;
+  flex-shrink: 0;
 }
 
 /* ═══════════════════════
