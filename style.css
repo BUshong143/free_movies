@@ -24,6 +24,12 @@
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html{scroll-behavior:smooth;}
+
+/* ── PREVENT IOS AUTO-ZOOM (inputs must be >= 16px font-size) ── */
+input, textarea, select {
+  font-size: 16px !important;
+}
+
 body{
   background:var(--bg);
   color:var(--text);
@@ -111,7 +117,7 @@ nav{
 .search-wrap input{
   background:none;border:none;outline:none;
   color:var(--text);font-family:'Poppins',sans-serif;
-  font-size:13px;font-weight:400;width:170px;
+  font-size:16px !important;font-weight:400;width:170px;
 }
 .search-wrap input::placeholder{color:var(--muted);}
 
