@@ -1,8 +1,13 @@
 // ══════════════════════════════════════════════════
 //  CineFy — Watch Together  (watch-together.js)
 //  Real-time sync via Supabase Realtime
-//  Features: play/pause sync, host transfer,
-//  mobile chat drawer, error handling
+//  Features:
+//   ✓ play/pause sync
+//   ✓ host transfer
+//   ✓ mobile chat drawer
+//   ✓ session persistence (rejoin on refresh/exit)
+//   ✓ reconnect banner
+//   ✓ no auto-zoom on inputs
 // ══════════════════════════════════════════════════
 
 const SUPABASE_URL  = 'https://eqlfwukjidnrwcgfnzjo.supabase.co';
@@ -17,7 +22,7 @@ const TB    = 'https://api.themoviedb.org/3';
 const IBASE = 'https://image.tmdb.org/t/p/';
 const JB    = 'https://api.jikan.moe/v4';
 
-// Source list — single source of truth
+// Source list
 const SOURCES = [
   { n: 'VidSrc',    base: 'https://vidsrc.xyz/embed' },
   { n: 'VidSrc.to', base: 'https://vidsrc.to/embed' },
@@ -26,20 +31,49 @@ const SOURCES = [
   { n: 'Smashy',    base: 'https://player.smashy.stream' },
 ];
 
+// ── SESSION PERSISTENCE KEYS ──
+const SESSION_KEY = 'cinefy_wt_session';
+
+function saveSession() {
+  if (!roomCode) return;
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+    roomCode,
+    myNick,
+    myUserId,
+    isHost,
+    currentTitle: document.getElementById('roomMovieTitle')?.textContent || '',
+    currentSrcs,
+    currentSrcIdx
+  }));
+}
+
+function loadSession() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) { return null; }
+}
+
+function clearSession() {
+  sessionStorage.removeItem(SESSION_KEY);
+}
+
 // App state
-let myNick      = '';
-let myUserId    = crypto.randomUUID();
-let roomCode    = '';
-let isHost      = false;
-let channel     = null;
-let members     = {};        // { userId: { nick, isHost } }
-let currentSrcs = [];
-let currentSrcIdx = 0;       // track which source is active
-let isPaused    = false;     // track paused state
-let hcTimer     = null;
-let unreadCount = 0;
+let myNick        = '';
+let myUserId      = crypto.randomUUID();
+let roomCode      = '';
+let isHost        = false;
+let channel       = null;
+let members       = {};
+let currentSrcs   = [];
+let currentSrcIdx = 0;
+let isPaused      = false;
+let hcTimer       = null;
+let unreadCount   = 0;
 let chatDrawerOpen = false;
-let isMobile    = () => window.innerWidth <= 768;
+let reconnectBanner = null;
+
+const isMobile = () => window.innerWidth <= 768;
 
 // ── UTILITIES ──
 function esc(s) {
@@ -84,6 +118,25 @@ async function getAnimeEmbedSrcs(malId, animeTitle) {
   ];
 }
 
+// ── RECONNECT BANNER ──
+function showReconnectBanner() {
+  if (reconnectBanner) return;
+  reconnectBanner = document.createElement('div');
+  reconnectBanner.className = 'reconnect-banner';
+  reconnectBanner.innerHTML = `
+    <div class="reconnect-spinner"></div>
+    <span>Reconnecting to room…</span>
+  `;
+  document.body.appendChild(reconnectBanner);
+}
+
+function hideReconnectBanner() {
+  if (reconnectBanner) {
+    reconnectBanner.remove();
+    reconnectBanner = null;
+  }
+}
+
 // ── LOBBY ──
 function setLobbyErr(msg) {
   document.getElementById('lbErr').textContent = msg;
@@ -123,19 +176,22 @@ document.getElementById('nickInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('createRoomBtn').click();
 });
 
-// ── ENTER ROOM ──
-async function enterRoom() {
+// ── ENTER ROOM (shared by fresh join + session restore) ──
+async function enterRoom(isReconnect = false) {
   document.getElementById('lobby').style.display    = 'none';
   document.getElementById('roomView').style.display = 'flex';
   document.getElementById('roomCodeDisplay').textContent = roomCode;
 
   members[myUserId] = { nick: myNick, isHost };
 
+  // Save session so refresh can restore it
+  saveSession();
+
   channel = sb.channel(`cinefy-room-${roomCode}`, {
     config: { presence: { key: myUserId } }
   });
 
-  // Presence sync
+  // ── PRESENCE SYNC ──
   channel.on('presence', { event: 'sync' }, () => {
     const state = channel.presenceState();
     const prevMembers = { ...members };
@@ -146,15 +202,17 @@ async function enterRoom() {
       });
     });
 
-    // Host transfer: if old host left and I'm first non-host, become host
-    const wasHost = Object.entries(prevMembers).find(([,m]) => m.isHost)?.[0];
-    const stillHere = Object.keys(members).includes(wasHost);
-    if (!stillHere && !isHost) {
+    // Host transfer: if host left, first alphabetical member becomes host
+    const hostEntry = Object.entries(prevMembers).find(([,m]) => m.isHost);
+    const wasHostId = hostEntry?.[0];
+    const hostStillHere = wasHostId && Object.keys(members).includes(wasHostId);
+    if (!hostStillHere && !isHost) {
       const sorted = Object.keys(members).sort();
       if (sorted[0] === myUserId) {
         isHost = true;
         members[myUserId].isHost = true;
         channel.track({ userId: myUserId, nick: myNick, isHost: true });
+        saveSession();
         showHostControls();
         addSystemMsg('You became the new host 👑');
         toast('You are now the host 👑');
@@ -162,6 +220,7 @@ async function enterRoom() {
     }
 
     renderMembers();
+    saveSession();
   });
 
   channel.on('presence', { event: 'join' }, ({ newPresences }) => {
@@ -176,68 +235,119 @@ async function enterRoom() {
     });
   });
 
-  // Chat
+  // ── CHAT ──
   channel.on('broadcast', { event: 'chat' }, ({ payload }) => {
     appendChat(payload.nick, payload.text, payload.ts, payload.userId === myUserId);
-    // Mobile badge
     if (isMobile() && !chatDrawerOpen) {
       unreadCount++;
       updateBadge();
     }
   });
 
-  // Title sync
+  // ── TITLE SYNC ──
   channel.on('broadcast', { event: 'play_title' }, ({ payload }) => {
     if (!isHost) receivePlayTitle(payload);
+    // Save the current playing title/srcs to session
+    currentSrcs   = payload.srcs;
+    currentSrcIdx = 0;
+    saveSession();
   });
 
-  // Source change sync
+  // ── SOURCE CHANGE SYNC ──
   channel.on('broadcast', { event: 'change_source' }, ({ payload }) => {
     if (!isHost) loadRoomSrc(payload.idx, payload.srcs);
+    currentSrcIdx = payload.idx;
+    saveSession();
   });
 
-  // ── PLAY/PAUSE SYNC — any member can broadcast ──
+  // ── PLAY/PAUSE SYNC ──
   channel.on('broadcast', { event: 'playback_cmd' }, ({ payload }) => {
     const { cmd, senderNick, senderId } = payload;
-    if (senderId === myUserId) return; // ignore own events
+    if (senderId === myUserId) return;
     applyPlaybackCmd(cmd, senderNick);
   });
 
-  // Subscribe with error handling
+  // ── SUBSCRIBE ──
   await channel.subscribe(async (status, err) => {
     if (status === 'SUBSCRIBED') {
+      hideReconnectBanner();
       await channel.track({ userId: myUserId, nick: myNick, isHost });
+
       if (isHost) {
         showHostControls();
-        addSystemMsg(`You created this room. Share code: ${roomCode}`);
-        // Auto-load title if coming from main app
-        if (window._autoPlay) {
-          const { title, id, type } = window._autoPlay;
-          window._autoPlay = null;
-          setTimeout(() => hostPickTMDB(id, type, title), 600);
+        if (!isReconnect) {
+          addSystemMsg(`You created this room. Share code: ${roomCode}`);
+          // Auto-load title if coming from main app
+          if (window._autoPlay) {
+            const { title, id, type } = window._autoPlay;
+            window._autoPlay = null;
+            setTimeout(() => hostPickTMDB(id, type, title), 600);
+          }
+        } else {
+          addSystemMsg(`Rejoined your room: ${roomCode} 👑`);
+          toast('Reconnected to your room! 👑');
         }
       } else {
         showViewerNotice();
-        addSystemMsg(`You joined room ${roomCode}`);
+        if (!isReconnect) {
+          addSystemMsg(`You joined room ${roomCode}`);
+        } else {
+          addSystemMsg(`Rejoined room ${roomCode} 👋`);
+          toast('Reconnected to room! 👋');
+        }
       }
+
       setupSyncBar();
+
+      // If reconnecting and there was a title playing, restore it
+      if (isReconnect && currentSrcs.length > 0) {
+        const savedTitle = document.getElementById('roomMovieTitle').textContent;
+        if (savedTitle && savedTitle !== 'No title selected') {
+          loadPlayTitle({ title: savedTitle, srcs: currentSrcs }, true);
+        }
+      }
+
     } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-      toast('Connection failed. Check your room code or network. ❌');
       console.error('Supabase channel error:', err);
-      leaveRoom();
+      showReconnectBanner();
+      // Auto-retry after 3s
+      setTimeout(() => retryConnection(), 3000);
     } else if (status === 'CLOSED') {
-      toast('Disconnected from room.');
+      hideReconnectBanner();
     }
   });
 }
 
-// ── SYNC BAR SETUP (play/pause buttons) ──
+// ── RETRY CONNECTION ──
+async function retryConnection() {
+  if (channel) {
+    try { await channel.unsubscribe(); } catch(e) {}
+    channel = null;
+  }
+  if (!roomCode) return;
+  showReconnectBanner();
+  try {
+    await enterRoom(true);
+  } catch(e) {
+    setTimeout(() => retryConnection(), 4000);
+  }
+}
+
+// ── SYNC BAR ──
 function setupSyncBar() {
-  document.getElementById('syncPlayBtn').addEventListener('click', () => {
+  // Remove old listeners by cloning
+  const playBtn  = document.getElementById('syncPlayBtn');
+  const pauseBtn = document.getElementById('syncPauseBtn');
+  const newPlay  = playBtn.cloneNode(true);
+  const newPause = pauseBtn.cloneNode(true);
+  playBtn.parentNode.replaceChild(newPlay, playBtn);
+  pauseBtn.parentNode.replaceChild(newPause, pauseBtn);
+
+  newPlay.addEventListener('click', () => {
     broadcastPlaybackCmd('play');
     applyPlaybackCmd('play', myNick + ' (you)');
   });
-  document.getElementById('syncPauseBtn').addEventListener('click', () => {
+  newPause.addEventListener('click', () => {
     broadcastPlaybackCmd('pause');
     applyPlaybackCmd('pause', myNick + ' (you)');
   });
@@ -337,12 +447,14 @@ function addSyncEventMsg(text) {
 document.getElementById('leaveBtn').addEventListener('click', leaveRoom);
 
 function leaveRoom() {
+  clearSession(); // remove persisted session on intentional leave
   if (channel) channel.unsubscribe();
   channel = null; members = {}; currentSrcs = [];
-  roomCode = ''; isHost = false; unreadCount = 0;
+  roomCode = ''; isHost = false; unreadCount = 0; currentSrcIdx = 0;
 
-  document.getElementById('roomFrame').src = '';
-  document.getElementById('roomFrame').style.display = 'none';
+  const frame = document.getElementById('roomFrame');
+  frame.src = '';
+  frame.style.display = 'none';
   document.getElementById('roomPlaceholder').style.display = 'flex';
   document.getElementById('rpSubText').textContent = '';
   document.getElementById('roomSrcBar').style.display = 'none';
@@ -357,6 +469,7 @@ function leaveRoom() {
   document.getElementById('hcSearch').value = '';
   document.getElementById('hostControls').style.display = 'none';
   document.getElementById('viewerNotice').style.display = 'none';
+  hideReconnectBanner();
   updateBadge();
   closeChatDrawer();
 
@@ -488,7 +601,12 @@ function showHostControls() {
   document.getElementById('viewerNotice').style.display = 'none';
   document.getElementById('syncBar').style.display = 'flex';
 
-  document.getElementById('hcSearch').addEventListener('input', e => {
+  const searchInput = document.getElementById('hcSearch');
+  // Remove existing listener by cloning
+  const newSearch = searchInput.cloneNode(true);
+  searchInput.parentNode.replaceChild(newSearch, searchInput);
+
+  newSearch.addEventListener('input', e => {
     clearTimeout(hcTimer);
     const v = e.target.value.trim();
     if (!v) { document.getElementById('hcResults').innerHTML = ''; return; }
@@ -569,17 +687,20 @@ async function hostPickAnime(malId, title) {
 function broadcastAndPlay(payload) {
   channel.send({ type: 'broadcast', event: 'play_title', payload });
   loadPlayTitle(payload);
+  currentSrcs   = payload.srcs;
+  currentSrcIdx = 0;
+  saveSession();
   toast(`Now playing: ${payload.title} 🎬`);
 }
 
 // ── PLAYBACK ──
-function loadPlayTitle(payload) {
+function loadPlayTitle(payload, silent = false) {
   const { title, srcs } = payload;
   currentSrcs = srcs;
   document.getElementById('roomMovieTitle').textContent = title;
   document.getElementById('roomPlaceholder').style.display = 'none';
 
-  const srcBar = document.getElementById('roomSrcBar');
+  const srcBar  = document.getElementById('roomSrcBar');
   const srcTabs = document.getElementById('roomSrcTabs');
   srcBar.style.display = 'flex';
   srcTabs.innerHTML = '';
@@ -591,7 +712,7 @@ function loadPlayTitle(payload) {
     srcTabs.appendChild(btn);
   });
 
-  loadRoomSrcByIdx(0);
+  loadRoomSrcByIdx(currentSrcIdx || 0);
 }
 
 function receivePlayTitle(payload) {
@@ -601,6 +722,8 @@ function receivePlayTitle(payload) {
 }
 
 function switchRoomSrc(idx) {
+  currentSrcIdx = idx;
+  saveSession();
   loadRoomSrcByIdx(idx);
   if (isHost && channel) {
     channel.send({ type: 'broadcast', event: 'change_source', payload: { idx, srcs: currentSrcs } });
@@ -608,7 +731,9 @@ function switchRoomSrc(idx) {
 }
 
 function loadRoomSrc(idx, srcs) {
-  currentSrcs = srcs;
+  currentSrcs   = srcs;
+  currentSrcIdx = idx;
+  saveSession();
   const srcTabs = document.getElementById('roomSrcTabs');
   srcTabs.innerHTML = '';
   srcs.forEach((s, i) => {
@@ -646,30 +771,57 @@ function loadRoomSrcByIdx(idx) {
   toast(`Loading ${s.n}… 🎬`);
 }
 
-// ── INIT: URL room code + auto-title from main app ──
-(function checkURLRoom() {
+// ── INIT — URL params + session restore ──
+(function init() {
   const params = new URLSearchParams(window.location.search);
 
-  // Join by room code
+  // ── 1. Try to restore existing session (refresh/back navigation) ──
+  const session = loadSession();
+  if (session && session.roomCode) {
+    // Restore state from session
+    myNick        = session.myNick;
+    myUserId      = session.myUserId; // keep same userId so presence tracks correctly
+    roomCode      = session.roomCode;
+    isHost        = session.isHost;
+    currentSrcs   = session.currentSrcs   || [];
+    currentSrcIdx = session.currentSrcIdx || 0;
+
+    // Pre-fill the lobby inputs in case reconnect fails and user lands on lobby
+    document.getElementById('nickInput').value = myNick;
+
+    // Restore title display
+    const savedTitle = session.currentTitle;
+    if (savedTitle && savedTitle !== 'No title selected') {
+      document.getElementById('roomMovieTitle').textContent = savedTitle;
+    }
+
+    // Show reconnect banner immediately
+    showReconnectBanner();
+
+    // Reconnect to room
+    enterRoom(true);
+    return;
+  }
+
+  // ── 2. Join by room code from URL ──
   const code = params.get('room');
   if (code && code.length === 6) {
     document.getElementById('codeInput').value = code.toUpperCase();
   }
 
-  // Auto-title: came from "Watch Together" button on a movie card
+  // ── 3. Auto-title from main app "Watch Together" button ──
   const autoTitle = params.get('autotitle');
   const autoId    = params.get('autoid');
   const autoType  = params.get('autotype');
   if (autoTitle && autoId && autoType) {
     window._autoPlay = { title: decodeURIComponent(autoTitle), id: autoId, type: autoType };
-    // Show hint in lobby
-    const sub = document.querySelector('.lb-sub');
+    const sub = document.getElementById('lobbySub');
     if (sub) {
       sub.innerHTML = `Ready to watch <strong style="color:var(--accent)">${decodeURIComponent(autoTitle)}</strong> together! Create a room and share the code with friends.`;
     }
   }
 })();
 
-// Hamburger nav
+// ── HAMBURGER NAV ──
 const hbtn = document.getElementById('hbtn');
 if (hbtn) hbtn.addEventListener('click', () => hbtn.classList.toggle('open'));
