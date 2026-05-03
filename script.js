@@ -1,410 +1,442 @@
-const TKEY='8265bd1679663a7ea12ac168da84d2e8';
-const TB='https://api.themoviedb.org/3';
-const IBASE='https://image.tmdb.org/t/p/';
-const JB='https://api.jikan.moe/v4';
-const GENRES=[
-  {id:28,n:'Action'},{id:12,n:'Adventure'},{id:16,n:'Animation'},{id:35,n:'Comedy'},
-  {id:80,n:'Crime'},{id:18,n:'Drama'},{id:14,n:'Fantasy'},{id:27,n:'Horror'},
-  {id:10749,n:'Romance'},{id:878,n:'Sci-Fi'},{id:53,n:'Thriller'}
-];
- 
-let heroItems=[],heroIdx=0,heroTimer,curPage='home';
-let pId,pType,pTitle;
-let isFullscreen=false;
- 
-// ── FULLSCREEN ──
-function toggleFullscreen(){
-  const playerEl=document.getElementById('player');
-  if(!document.fullscreenElement&&!document.webkitFullscreenElement&&!document.mozFullScreenElement&&!document.msFullscreenElement){
-    // Enter fullscreen
-    const req=playerEl.requestFullscreen||playerEl.webkitRequestFullscreen||playerEl.mozRequestFullScreen||playerEl.msRequestFullscreen;
-    if(req){
-      req.call(playerEl).catch(err=>{
-        // Fallback: try the iframe
-        const fr=document.getElementById('pFrame');
-        const frReq=fr.requestFullscreen||fr.webkitRequestFullscreen||fr.mozRequestFullScreen||fr.msRequestFullscreen;
-        if(frReq)frReq.call(fr).catch(()=>{});
-      });
-    }
-  } else {
-    // Exit fullscreen
-    const ex=document.exitFullscreen||document.webkitExitFullscreen||document.mozCancelFullScreen||document.msExitFullscreen;
-    if(ex)ex.call(document).catch(()=>{});
-  }
+// ══════════════════════════════════════════════════
+//  CineFy — Watch Together  (watch-together.js)
+//  Uses Supabase Realtime for live room sync + chat
+// ══════════════════════════════════════════════════
+
+// ─────────────────────────────────────────
+//  🔧 REPLACE THESE WITH YOUR SUPABASE KEYS
+// ─────────────────────────────────────────
+const SUPABASE_URL  = 'YOUR_SUPABASE_URL';       // e.g. https://xyzabc.supabase.co
+const SUPABASE_ANON = 'YOUR_SUPABASE_ANON_KEY';  // your public anon key
+// ─────────────────────────────────────────
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// TMDB + Jikan (reuse from main app)
+const TKEY   = '8265bd1679663a7ea12ac168da84d2e8';
+const TB     = 'https://api.themoviedb.org/3';
+const IBASE  = 'https://image.tmdb.org/t/p/';
+const JB     = 'https://api.jikan.moe/v4';
+
+// App state
+let myNick    = '';
+let myUserId  = crypto.randomUUID();
+let roomCode  = '';
+let isHost    = false;
+let channel   = null;   // Supabase realtime channel
+let members   = {};     // { userId: { nick, isHost } }
+let currentSrcs = [];   // current source list
+let hcTimer   = null;
+
+// ── Embed sources (same logic as main app) ──
+function getSrc(id, type) {
+  const t = type === 'tv' ? 'tv' : 'movie';
+  return [
+    { n: 'VidSrc',    u: `https://vidsrc.xyz/embed/${t}/${id}` },
+    { n: 'VidSrc.to', u: `https://vidsrc.to/embed/${t}/${id}` },
+    { n: 'Embed.su',  u: `https://embed.su/embed/${t}/${id}` },
+    { n: 'AutoEmbed', u: `https://autoembed.co/embed/${t}/${id}` },
+    { n: 'Smashy',    u: `https://player.smashy.stream/${t}/${id}` },
+  ];
 }
- 
-function updateFsIcon(isFs){
-  const icon=document.getElementById('fsIcon');
-  if(isFs){
-    icon.innerHTML='<path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>';
-  } else {
-    icon.innerHTML='<path d="M3 3h6v2H5v4H3V3zm12 0h6v6h-2V5h-4V3zM3 13h2v4h4v2H3v-6zm16 4h-4v2h6v-6h-2v4z"/>';
-  }
+async function getAnimeEmbedSrcs(malId, animeTitle) {
+  try {
+    const s = await tmdbFetch('/search/tv', `&query=${encodeURIComponent(animeTitle)}`);
+    if (s.results?.[0]) return getSrc(s.results[0].id, 'tv');
+  } catch(e) {}
+  try {
+    const s2 = await tmdbFetch('/search/movie', `&query=${encodeURIComponent(animeTitle)}`);
+    if (s2.results?.[0]) return getSrc(s2.results[0].id, 'movie');
+  } catch(e) {}
+  const enc = encodeURIComponent(animeTitle);
+  return [
+    { n: 'VidSrc',     u: `https://vidsrc.xyz/embed/tv/${malId}` },
+    { n: 'Gogoanime',  u: `https://gogoanime3.co/search.html?keyword=${enc}` },
+    { n: 'Animepahe',  u: `https://animepahe.ru/search?q=${enc}` },
+    { n: '9anime',     u: `https://9anime.gs/search?keyword=${enc}` },
+    { n: 'Zoro.to',    u: `https://hianime.to/search?keyword=${enc}` },
+  ];
 }
- 
-// Listen to fullscreen changes (all vendor prefixes)
-['fullscreenchange','webkitfullscreenchange','mozfullscreenchange','MSFullscreenChange'].forEach(evt=>{
-  document.addEventListener(evt,()=>{
-    const isFs=!!(document.fullscreenElement||document.webkitFullscreenElement||document.mozFullScreenElement||document.msFullscreenElement);
-    isFullscreen=isFs;
-    updateFsIcon(isFs);
+async function tmdbFetch(p, x = '') {
+  return (await fetch(`${TB}${p}?api_key=${TKEY}${x}`)).json();
+}
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── TOAST ──
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+// ── LOBBY ──
+function setLobbyErr(msg) {
+  document.getElementById('lbErr').textContent = msg;
+}
+
+function getNick() {
+  const v = document.getElementById('nickInput').value.trim();
+  if (!v) { setLobbyErr('Please enter a display name first.'); return null; }
+  if (v.length < 2) { setLobbyErr('Name must be at least 2 characters.'); return null; }
+  setLobbyErr('');
+  return v;
+}
+
+function genCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+async function createRoom() {
+  const nick = getNick();
+  if (!nick) return;
+  myNick = nick;
+  isHost = true;
+  roomCode = genCode();
+  await enterRoom();
+}
+
+async function joinRoom() {
+  const nick = getNick();
+  if (!nick) return;
+  const code = document.getElementById('codeInput').value.trim().toUpperCase();
+  if (code.length !== 6) { setLobbyErr('Room code must be 6 characters.'); return; }
+  myNick = nick;
+  isHost = false;
+  roomCode = code;
+  await enterRoom();
+}
+
+// ── ENTER ROOM ──
+async function enterRoom() {
+  document.getElementById('lobby').style.display    = 'none';
+  document.getElementById('roomView').style.display = 'flex';
+  document.getElementById('roomCodeDisplay').textContent = roomCode;
+
+  // Set up member record
+  members[myUserId] = { nick: myNick, isHost };
+
+  // Subscribe to Supabase Realtime channel for this room
+  channel = sb.channel(`cinefy-room-${roomCode}`, {
+    config: { presence: { key: myUserId } }
   });
-});
- 
-// ── ANIME EMBED SOURCES ──
-async function getAnimeEmbedSrcs(malId,animeTitle){
-  try{const s=await tmdb('/search/tv',`&query=${encodeURIComponent(animeTitle)}`);if(s.results?.[0])return buildSrcs(s.results[0].id,'tv',animeTitle);}catch(e){}
-  try{const s2=await tmdb('/search/movie',`&query=${encodeURIComponent(animeTitle)}`);if(s2.results?.[0])return buildSrcs(s2.results[0].id,'movie',animeTitle);}catch(e){}
-  return buildSrcsFallback(malId,animeTitle);
+
+  // Presence: someone joins/leaves
+  channel.on('presence', { event: 'sync' }, () => {
+    const state = channel.presenceState();
+    members = {};
+    Object.values(state).forEach(presences => {
+      presences.forEach(p => {
+        members[p.userId] = { nick: p.nick, isHost: p.isHost };
+      });
+    });
+    renderMembers();
+  });
+
+  channel.on('presence', { event: 'join' }, ({ key, newPresences }) => {
+    newPresences.forEach(p => {
+      if (p.userId !== myUserId) {
+        addSystemMsg(`${p.nick} joined the room 👋`);
+      }
+    });
+  });
+
+  channel.on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+    leftPresences.forEach(p => {
+      addSystemMsg(`${p.nick} left the room`);
+    });
+  });
+
+  // Broadcast: receive events from others
+  channel.on('broadcast', { event: 'chat' }, ({ payload }) => {
+    appendChat(payload.nick, payload.text, payload.ts, payload.userId === myUserId);
+  });
+
+  channel.on('broadcast', { event: 'play_title' }, ({ payload }) => {
+    if (!isHost) {
+      // Non-host receives the title to play
+      receivePlayTitle(payload);
+    }
+  });
+
+  channel.on('broadcast', { event: 'change_source' }, ({ payload }) => {
+    if (!isHost) {
+      loadRoomSrc(payload.idx, payload.srcs);
+    }
+  });
+
+  // Subscribe and track presence
+  await channel.subscribe(async (status) => {
+    if (status === 'SUBSCRIBED') {
+      await channel.track({
+        userId: myUserId,
+        nick:   myNick,
+        isHost: isHost,
+      });
+
+      if (isHost) {
+        showHostControls();
+        addSystemMsg('You created this room. Share code: ' + roomCode);
+      } else {
+        showViewerNotice();
+        addSystemMsg('You joined room ' + roomCode);
+      }
+    }
+  });
+
+  // Chat enter key
+  document.getElementById('chatInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') sendChat();
+  });
 }
-function buildSrcs(id,type,title){
-  const t=type==='tv'?'tv':'movie';
-  return[
-    {n:'VidSrc',u:`https://vidsrc.xyz/embed/${t}/${id}`},
-    {n:'VidSrc.to',u:`https://vidsrc.to/embed/${t}/${id}`},
-    {n:'Embed.su',u:`https://embed.su/embed/${t}/${id}`},
-    {n:'AutoEmbed',u:`https://autoembed.co/embed/${t}/${id}`},
-    {n:'Smashy',u:`https://player.smashy.stream/${t}/${id}`},
-  ];
+
+function leaveRoom() {
+  if (channel) channel.unsubscribe();
+  channel = null;
+  members = {};
+  currentSrcs = [];
+  roomCode = '';
+  isHost = false;
+
+  // Reset UI
+  document.getElementById('roomFrame').src = '';
+  document.getElementById('roomFrame').style.display = 'none';
+  document.getElementById('roomPlaceholder').style.display = 'flex';
+  document.getElementById('rpSubText').textContent = '';
+  document.getElementById('roomSrcBar').style.display = 'none';
+  document.getElementById('roomSrcTabs').innerHTML = '';
+  document.getElementById('roomMovieTitle').textContent = 'No title selected';
+  document.getElementById('chatMessages').innerHTML = '<div class="chat-system">Welcome to the room! 👋</div>';
+  document.getElementById('membersList').innerHTML = '';
+  document.getElementById('hcResults').innerHTML = '';
+  document.getElementById('hcSearch').value = '';
+  document.getElementById('hostControls').style.display  = 'none';
+  document.getElementById('viewerNotice').style.display  = 'none';
+
+  document.getElementById('roomView').style.display = 'none';
+  document.getElementById('lobby').style.display = 'flex';
 }
-function buildSrcsFallback(malId,title){
-  const enc=encodeURIComponent(title);
-  return[
-    {n:'VidSrc',u:`https://vidsrc.xyz/embed/tv/${malId}`},
-    {n:'Gogoanime',u:`https://gogoanime3.co/search.html?keyword=${enc}`},
-    {n:'Animepahe',u:`https://animepahe.ru/search?q=${enc}`},
-    {n:'9anime',u:`https://9anime.gs/search?keyword=${enc}`},
-    {n:'Zoro.to',u:`https://hianime.to/search?keyword=${enc}`},
-  ];
+
+function copyRoomCode() {
+  if (!roomCode) return;
+  navigator.clipboard.writeText(roomCode).then(() => toast('Room code copied! 📋'));
 }
-function getSrc(id,type){
-  const t=type==='tv'?'tv':'movie';
-  return[
-    {n:'VidSrc',u:`https://vidsrc.xyz/embed/${t}/${id}`},
-    {n:'VidSrc.to',u:`https://vidsrc.to/embed/${t}/${id}`},
-    {n:'Embed.su',u:`https://embed.su/embed/${t}/${id}`},
-    {n:'AutoEmbed',u:`https://autoembed.co/embed/${t}/${id}`},
-    {n:'Smashy',u:`https://player.smashy.stream/${t}/${id}`},
-  ];
-}
- 
-async function tmdb(p,x=''){return(await fetch(`${TB}${p}?api_key=${TKEY}${x}`)).json();}
-async function jikan(p){return(await fetch(`${JB}${p}`)).json();}
-function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function sk(n=10){return Array(n).fill('<div class="skel"><div class="sk-img"></div><div class="sk-info"><div class="sk-line"></div><div class="sk-line sk-s"></div></div></div>').join('');}
- 
-function renderTMDB(arr,id,isTV=false){
-  const el=document.getElementById(id);if(!el)return;
-  el.innerHTML=arr.map(m=>{
-    const t=m.title||m.name||'?';
-    const y=(m.release_date||m.first_air_date||'').slice(0,4);
-    const r=m.vote_average?.toFixed(1)||'?';
-    const img=m.poster_path?`<img src="${IBASE}w342${m.poster_path}" alt="${esc(t)}" decoding="async">`:`<div class="card-np">🎬</div>`;
-    const tp=isTV?'tv':'movie';
-    return `<div class="card" onclick="openDetail(${m.id},'${tp}')">
-      <div class="card-poster">${img}<div class="card-rating-badge">⭐ ${r}</div>
-        <div class="card-overlay"><div class="card-play">▶</div><div class="card-ov-title">${esc(t)}</div></div>
-      </div>
-      <div class="card-info">
-        <div class="card-title">${esc(t)}</div>
-        <div class="card-sub"><span>${y}</span></div>
-      </div>
+
+// ── MEMBER LIST ──
+function renderMembers() {
+  const list = document.getElementById('membersList');
+  const count = document.getElementById('memberCount');
+  const arr = Object.entries(members);
+  count.textContent = arr.length;
+  list.innerHTML = arr.map(([uid, m]) => {
+    const initial = (m.nick||'?')[0].toUpperCase();
+    const isMe = uid === myUserId;
+    return `<div class="member-item">
+      <div class="member-avatar">${initial}</div>
+      <span class="member-name">${esc(m.nick)}${isMe ? ' (you)' : ''}</span>
+      ${m.isHost ? '<span class="member-host-badge">HOST</span>' : ''}
     </div>`;
   }).join('');
 }
- 
-function renderAnime(arr,id){
-  const el=document.getElementById(id);if(!el)return;
-  el.innerHTML=arr.map(a=>{
-    const t=a.title_english||a.title||'?';
-    const r=a.score?a.score.toFixed(1):'?';
-    const ep=a.episodes?`${a.episodes}ep`:'';
-    const imgSrc=a.images?.jpg?.large_image_url||a.images?.jpg?.image_url;
-    const poster=imgSrc?`<img src="${imgSrc}" alt="${esc(t)}" decoding="async">`:`<div class="card-np">⛩️</div>`;
-    const malId=a.mal_id;
-    const safeTitle=esc(t).replace(/'/g,'\\&#x27;');
-    return `<div class="card" onclick="openAnime(${malId},'${safeTitle}')">
-      <div class="card-poster">${poster}<div class="card-rating-badge">⭐ ${r}</div>
-        <div class="card-overlay"><div class="card-play">▶</div><div class="card-ov-title">${esc(t)}</div></div>
-      </div>
-      <div class="card-info">
-        <div class="card-title">${esc(t)}</div>
-        <div class="card-sub">${ep?`<span class="c-badge">${ep}</span>`:''}</div>
-      </div>
-    </div>`;
-  }).join('');
+
+// ── CHAT ──
+function sendChat() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text || !channel) return;
+  const ts = Date.now();
+  // Broadcast to others
+  channel.send({ type: 'broadcast', event: 'chat', payload: { nick: myNick, text, ts, userId: myUserId } });
+  // Show locally
+  appendChat(myNick, text, ts, true);
+  input.value = '';
 }
- 
-async function bootHome(){
-  ['r-trending','r-toprated','r-nowplaying','r-tvpop','r-anime'].forEach(i=>document.getElementById(i).innerHTML=sk());
-  document.getElementById('gpills').innerHTML=GENRES.map(g=>`<div class="g-pill" data-gid="${g.id}" onclick="goGenre(${g.id},'${g.n}')">${g.n}</div>`).join('');
-  const[tr,top,np,tv]=await Promise.all([
-    tmdb('/trending/movie/week'),tmdb('/movie/top_rated'),
-    tmdb('/movie/now_playing'),tmdb('/tv/popular')
+
+function appendChat(nick, text, ts, isMe) {
+  const box = document.getElementById('chatMessages');
+  const time = new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const div = document.createElement('div');
+  div.className = 'chat-msg';
+  div.innerHTML = `
+    <div class="chat-msg-header">
+      <span class="chat-msg-nick${isMe ? ' is-me' : ''}">${esc(nick)}</span>
+      <span class="chat-msg-time">${time}</span>
+    </div>
+    <div class="chat-msg-text">${esc(text)}</div>`;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function addSystemMsg(msg) {
+  const box = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  div.className = 'chat-system';
+  div.textContent = msg;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+// ── HOST: SEARCH & PICK TITLE ──
+function showHostControls() {
+  document.getElementById('hostControls').style.display = 'block';
+  document.getElementById('viewerNotice').style.display = 'none';
+
+  document.getElementById('hcSearch').addEventListener('input', e => {
+    clearTimeout(hcTimer);
+    const v = e.target.value.trim();
+    if (!v) { document.getElementById('hcResults').innerHTML = ''; return; }
+    hcTimer = setTimeout(() => hostSearch(v), 450);
+  });
+}
+
+function showViewerNotice() {
+  document.getElementById('viewerNotice').style.display = 'block';
+  document.getElementById('hostControls').style.display = 'none';
+}
+
+async function hostSearch(q) {
+  const res = document.getElementById('hcResults');
+  res.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 0">Searching…</div>';
+
+  const [mr, ar] = await Promise.all([
+    tmdbFetch('/search/multi', `&query=${encodeURIComponent(q)}`),
+    fetch(`${JB}/anime?q=${encodeURIComponent(q)}&limit=5`).then(r=>r.json()).catch(()=>({data:[]}))
   ]);
-  heroItems=tr.results.slice(0,6);buildHero();
-  renderTMDB(tr.results,'r-trending');
-  renderTMDB(top.results,'r-toprated');
-  renderTMDB(np.results,'r-nowplaying');
-  renderTMDB(tv.results,'r-tvpop',true);
-  loadAnimePreview();
-}
-async function loadAnimePreview(){
-  try{const d=await jikan('/top/anime?filter=airing&limit=16');renderAnime(d.data||[],'r-anime');}
-  catch(e){document.getElementById('r-anime').innerHTML='<p style="color:var(--muted);padding:20px;font-size:12px">Anime unavailable right now</p>';}
-}
-async function bootAnime(){
-  ['a-airing','a-popular','a-top','a-upcoming'].forEach(i=>document.getElementById(i).innerHTML=sk());
-  try{
-    const[ai,ap,at,au]=await Promise.all([
-      jikan('/top/anime?filter=airing&limit=20'),jikan('/top/anime?filter=bypopularity&limit=20'),
-      jikan('/top/anime?limit=20'),jikan('/top/anime?filter=upcoming&limit=20')
-    ]);
-    renderAnime(ai.data||[],'a-airing');renderAnime(ap.data||[],'a-popular');
-    renderAnime(at.data||[],'a-top');renderAnime(au.data||[],'a-upcoming');
-  }catch(e){['a-airing','a-popular','a-top','a-upcoming'].forEach(i=>{document.getElementById(i).innerHTML='<p style="color:var(--muted);padding:20px;font-size:12px">Failed to load</p>';});}
-}
-async function bootTV(){
-  ['t-popular','t-toprated','t-onair'].forEach(i=>document.getElementById(i).innerHTML=sk());
-  const[tp,tt,to]=await Promise.all([tmdb('/tv/popular'),tmdb('/tv/top_rated'),tmdb('/tv/on_the_air')]);
-  renderTMDB(tp.results,'t-popular',true);renderTMDB(tt.results,'t-toprated',true);renderTMDB(to.results,'t-onair',true);
-}
-async function bootMovies(){
-  ['m-trending','m-toprated','m-upcoming'].forEach(i=>document.getElementById(i).innerHTML=sk());
-  const[mt,mr,mu]=await Promise.all([tmdb('/trending/movie/week'),tmdb('/movie/top_rated'),tmdb('/movie/upcoming')]);
-  renderTMDB(mt.results,'m-trending');renderTMDB(mr.results,'m-toprated');renderTMDB(mu.results,'m-upcoming');
-}
- 
-const booted={home:false,anime:false,tv:false,movies:false};
-async function switchPage(pg){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.toggle('active',t.dataset.page===pg));
-  document.querySelectorAll('.sb-item[data-sid]').forEach(t=>t.classList.toggle('active',t.dataset.sid===pg));
-  document.getElementById('spage').classList.remove('on');
-  document.getElementById('q').value='';
-  curPage=pg;
-  const el=document.getElementById('pg-'+pg);
-  if(el)el.classList.add('active');
-  if(pg==='home'&&!booted.home){booted.home=true;await bootHome();}
-  if(pg==='anime'&&!booted.anime){booted.anime=true;await bootAnime();}
-  if(pg==='tv'&&!booted.tv){booted.tv=true;await bootTV();}
-  if(pg==='movies'&&!booted.movies){booted.movies=true;await bootMovies();}
-  window.scrollTo({top:0,behavior:'smooth'});
-}
-function goHome(){switchPage('home');}
- 
-// HERO
-function buildHero(){
-  document.getElementById('hdots').innerHTML=heroItems.map((_,i)=>`<div class="hdot ${i===0?'active':''}" onclick="setHero(${i})"></div>`).join('');
-  setHero(0);clearInterval(heroTimer);
-  heroTimer=setInterval(()=>setHero((heroIdx+1)%heroItems.length),8000);
-}
-function setHero(i){
-  heroIdx=i;const m=heroItems[i];
-  document.getElementById('htitle').textContent=m.title||m.name;
-  document.getElementById('hrating').textContent=`⭐ ${m.vote_average?.toFixed(1)||'?'}`;
-  document.getElementById('hyear').textContent=(m.release_date||'').slice(0,4);
-  document.getElementById('hgenre').textContent=GENRES.find(g=>g.id===m.genre_ids?.[0])?.n||'Film';
-  document.getElementById('hdesc').textContent=m.overview||'';
-  document.getElementById('himg').src=m.backdrop_path?`${IBASE}original${m.backdrop_path}`:'';
-  document.getElementById('hero-counter').textContent=`0${i+1} / 0${heroItems.length}`;
-  document.getElementById('hplay').onclick=()=>launch(m.id,'movie',m.title||m.name);
-  document.getElementById('hinfo').onclick=()=>openDetail(m.id,'movie');
-  document.querySelectorAll('.hdot').forEach((d,j)=>d.classList.toggle('active',j===i));
-}
- 
-// DETAIL MODAL
-async function openDetail(id,type){
-  document.getElementById('moverlay').classList.add('open');
-  document.body.style.overflow='hidden';
-  document.getElementById('mtitle').textContent='Loading…';
-  ['mdesc','mmeta','macts','mbd'].forEach(x=>document.getElementById(x).innerHTML='');
-  try{
-    const d=await tmdb(`/${type}/${id}`);
-    const title=d.title||d.name||'?';
-    const year=(d.release_date||d.first_air_date||'').slice(0,4);
-    const rt=d.runtime?`${Math.floor(d.runtime/60)}h ${d.runtime%60}m`:(d.episode_run_time?.[0]?`~${d.episode_run_time[0]}m/ep`:'');
-    if(d.backdrop_path)document.getElementById('mbd').innerHTML=`<img src="${IBASE}w1280${d.backdrop_path}" alt="">`;
-    document.getElementById('mtitle').textContent=title;
-    document.getElementById('mdesc').textContent=d.overview||'No description.';
-    document.getElementById('mmeta').innerHTML=`
-      <div class="m-rating">⭐ ${d.vote_average?.toFixed(1)||'?'}</div>
-      ${year?`<span class="tag">${year}</span>`:''}
-      ${rt?`<span class="tag">⏱ ${rt}</span>`:''}
-      ${(d.genres||[]).map(g=>`<span class="tag g">${g.name}</span>`).join('')}
-      ${d.status?`<span class="tag">${d.status}</span>`:''}`;
-    const enc=encodeURIComponent(title);
-    document.getElementById('macts').innerHTML=`
-      <button class="btn-play" style="font-size:12px;padding:11px 24px" onclick="closeM();launch(${id},'${type}','${enc}')">▶&nbsp; Watch Now</button>
-      <button class="btn-info" style="font-size:12px;padding:11px 20px" onclick="toast('Added to Watchlist ✅')">+ Watchlist</button>`;
-  }catch(e){document.getElementById('mtitle').textContent='Failed to load.';}
-}
- 
-async function openAnime(malId,rawTitle){
-  document.getElementById('moverlay').classList.add('open');
-  document.body.style.overflow='hidden';
-  document.getElementById('mtitle').textContent='Loading…';
-  ['mdesc','mmeta','macts','mbd'].forEach(x=>document.getElementById(x).innerHTML='');
-  try{
-    const r=await jikan(`/anime/${malId}`);
-    const d=r.data;
-    const title=d.title_english||d.title||rawTitle||'?';
-    const img=d.images?.jpg?.large_image_url||d.images?.jpg?.image_url;
-    if(img)document.getElementById('mbd').innerHTML=`<img src="${img}" alt="" style="object-position:top center;">`;
-    document.getElementById('mtitle').textContent=title;
-    document.getElementById('mdesc').textContent=(d.synopsis||'No description.').replace(/\[Written by.*?\]/g,'');
-    document.getElementById('mmeta').innerHTML=`
-      <div class="m-rating">⭐ ${d.score||'?'}</div>
-      ${d.year?`<span class="tag">${d.year}</span>`:''}
-      ${d.episodes?`<span class="tag">📺 ${d.episodes} eps</span>`:''}
-      ${d.status?`<span class="tag">${d.status}</span>`:''}
-      ${(d.genres||[]).map(g=>`<span class="tag g">${g.name}</span>`).join('')}`;
-    const safeTitle=title;
-    document.getElementById('macts').innerHTML=`
-      <button class="btn-play" style="font-size:12px;padding:11px 24px" onclick="closeM();launchAnime(${malId},'${encodeURIComponent(safeTitle)}')">▶&nbsp; Watch Now</button>
-      <a class="btn-info" href="https://www.crunchyroll.com/search?q=${encodeURIComponent(safeTitle)}" target="_blank" rel="noopener" style="text-decoration:none;font-size:12px">Crunchyroll ↗</a>`;
-  }catch(e){document.getElementById('mtitle').textContent='Failed to load.';}
-}
- 
-async function launchAnime(malId,rawEncTitle){
-  const title=decodeURIComponent(rawEncTitle);
-  toast('Finding stream… 🔎');
-  const srcs=await getAnimeEmbedSrcs(malId,title);
-  pId=srcs[0]?.tmdbId||malId;pType='anime';pTitle=title;
-  window._animeSrcs=srcs;
-  document.getElementById('ptitle').textContent=title;
-  document.getElementById('stabs').innerHTML=srcs.map((s,i)=>`<button class="s-tab ${i===0?'active':''}" onclick="loadAnimeSrc(${i})">${s.n}</button>`).join('');
-  document.getElementById('player').classList.add('open');document.body.style.overflow='hidden';
-  loadAnimeSrc(0);
-}
-function loadAnimeSrc(i){
-  const srcs=window._animeSrcs||[];const s=srcs[i];if(!s)return;
-  const ld=document.getElementById('pload');ld.classList.remove('gone');
-  document.querySelectorAll('.s-tab').forEach((b,j)=>b.classList.toggle('active',j===i));
-  document.getElementById('otab').href=s.u;
-  const fr=document.getElementById('pFrame');fr.src='';
-  setTimeout(()=>{fr.src=s.u;fr.onload=()=>ld.classList.add('gone');setTimeout(()=>ld.classList.add('gone'),9000);},80);
-  toast(`Loading ${s.n}… 🎬`);
-}
- 
-function closeM(){document.getElementById('moverlay').classList.remove('open');document.body.style.overflow='';}
-function closeMBg(e){if(e.target===document.getElementById('moverlay'))closeM();}
- 
-function launch(id,type,rawTitle){
-  pId=id;pType=type;
-  pTitle=typeof rawTitle==='string'?decodeURIComponent(rawTitle):String(rawTitle);
-  const srcs=getSrc(id,type);window._animeSrcs=null;
-  document.getElementById('ptitle').textContent=pTitle;
-  document.getElementById('stabs').innerHTML=srcs.map((s,i)=>`<button class="s-tab ${i===0?'active':''}" onclick="loadSrc(${i})">${s.n}</button>`).join('');
-  document.getElementById('player').classList.add('open');document.body.style.overflow='hidden';
-  loadSrc(0);
-}
-function loadSrc(i){
-  const srcs=getSrc(pId,pType);const s=srcs[i];
-  const ld=document.getElementById('pload');ld.classList.remove('gone');
-  document.querySelectorAll('.s-tab').forEach((b,j)=>b.classList.toggle('active',j===i));
-  document.getElementById('otab').href=s.u;
-  const fr=document.getElementById('pFrame');fr.src='';
-  setTimeout(()=>{fr.src=s.u;fr.onload=()=>ld.classList.add('gone');setTimeout(()=>ld.classList.add('gone'),9000);},80);
-  toast(`Loading ${s.n}… 🎬`);
-}
-function closePlayer(){
-  // Exit fullscreen first if active
-  if(document.fullscreenElement||document.webkitFullscreenElement||document.mozFullScreenElement||document.msFullscreenElement){
-    const ex=document.exitFullscreen||document.webkitExitFullscreen||document.mozCancelFullScreen||document.msExitFullscreen;
-    if(ex)ex.call(document).catch(()=>{});
-  }
-  document.getElementById('player').classList.remove('open');
-  document.getElementById('pFrame').src='';
-  document.body.style.overflow='';
-  updateFsIcon(false);
-}
- 
-async function goGenre(gid,name){
-  document.querySelectorAll('.g-pill').forEach(p=>p.classList.toggle('active',+p.dataset.gid===gid));
-  document.getElementById('xsec').style.display='block';
-  document.getElementById('xtitle').innerHTML=`<span class="sec-num">+</span>${name} Films`;
-  document.getElementById('r-extra').innerHTML=sk();
-  switchPage('home');
-  const d=await tmdb('/discover/movie',`&with_genres=${gid}&sort_by=popularity.desc`);
-  renderTMDB(d.results,'r-extra');
-  document.getElementById('xsec').scrollIntoView({behavior:'smooth',block:'start'});
-}
-async function goAnimeGenre(gid,name){
-  switchPage('anime');
-  document.getElementById('ag-sec').style.display='block';
-  document.getElementById('ag-title').innerHTML=`<span class="sec-num">+</span>${name} Anime`;
-  document.getElementById('a-genre').innerHTML=sk();
-  try{const d=await jikan(`/anime?genres=${gid}&order_by=score&sort=desc&limit=20`);renderAnime(d.data||[],'a-genre');}
-  catch(e){document.getElementById('a-genre').innerHTML='<p style="color:var(--muted);padding:20px;font-size:12px">Failed to load</p>';}
-  document.getElementById('ag-sec').scrollIntoView({behavior:'smooth',block:'start'});
-}
- 
-let qTimer;
-document.getElementById('q').addEventListener('input',e=>{
-  clearTimeout(qTimer);const v=e.target.value.trim();
-  if(!v){hideSPage();return;}
-  qTimer=setTimeout(()=>doSearch(v),480);
-});
-async function doSearch(q){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  const sp=document.getElementById('spage');sp.classList.add('on');
-  document.getElementById('sq').textContent='"'+q+'"';
-  document.getElementById('sgrid').innerHTML=sk(12);
-  const[mr,ar]=await Promise.all([
-    tmdb('/search/multi',`&query=${encodeURIComponent(q)}`),
-    jikan(`/anime?q=${encodeURIComponent(q)}&limit=10`).catch(()=>({data:[]}))
-  ]);
-  const tmdbRes=(mr.results||[]).filter(m=>m.media_type==='movie'||m.media_type==='tv');
-  const animeRes=(ar.data||[]);
-  if(!tmdbRes.length&&!animeRes.length){
-    document.getElementById('sgrid').innerHTML='<p style="color:var(--muted);font-size:13px;grid-column:1/-1;padding-top:20px">No results found.</p>';
+
+  const tmdbItems = (mr.results || []).filter(m => m.media_type === 'movie' || m.media_type === 'tv').slice(0, 8);
+  const animeItems = (ar.data || []).slice(0, 4);
+
+  if (!tmdbItems.length && !animeItems.length) {
+    res.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 0">No results.</div>';
     return;
   }
-  const tmdbCards=tmdbRes.map(m=>{
-    const t=m.title||m.name||'?';const y=(m.release_date||m.first_air_date||'').slice(0,4);
-    const r=m.vote_average?.toFixed(1)||'?';
-    const img=m.poster_path?`<img src="${IBASE}w342${m.poster_path}" alt="${esc(t)}" decoding="async">`:`<div class="card-np">🎬</div>`;
-    const tp=m.media_type||'movie';
-    return `<div class="card" onclick="openDetail(${m.id},'${tp}')">
-      <div class="card-poster">${img}<div class="card-rating-badge">⭐ ${r}</div>
-        <div class="card-overlay"><div class="card-play">▶</div><div class="card-ov-title">${esc(t)}</div></div>
-      </div>
-      <div class="card-info"><div class="card-title">${esc(t)}</div><div class="card-sub"><span>${y}</span></div></div>
+
+  const tmdbCards = tmdbItems.map(m => {
+    const t = m.title || m.name || '?';
+    const img = m.poster_path
+      ? `<img src="${IBASE}w92${m.poster_path}" alt="${esc(t)}" decoding="async">`
+      : `<div class="hc-card-np">🎬</div>`;
+    const tp = m.media_type || 'movie';
+    return `<div class="hc-card" onclick="hostPickTMDB(${m.id},'${tp}','${esc(t).replace(/'/g,"\\'")}')">
+      ${img}
+      <div class="hc-card-badge">${tp==='tv'?'TV':'🎬'}</div>
+      <div class="hc-card-title">${esc(t)}</div>
     </div>`;
   });
-  const animeCards=animeRes.map(a=>{
-    const t=a.title_english||a.title||'?';const r=a.score?.toFixed(1)||'?';
-    const img=a.images?.jpg?.large_image_url||a.images?.jpg?.image_url;
-    const poster=img?`<img src="${img}" alt="${esc(t)}" decoding="async">`:`<div class="card-np">⛩️</div>`;
-    const safeTitle=esc(t).replace(/'/g,'\\&#x27;');
-    return `<div class="card" onclick="openAnime(${a.mal_id},'${safeTitle}')">
-      <div class="card-poster">${poster}<div class="card-rating-badge">⭐ ${r}</div>
-        <div class="card-overlay"><div class="card-play">▶</div><div class="card-ov-title">${esc(t)}</div></div>
-      </div>
-      <div class="card-info"><div class="card-title">${esc(t)}</div><div class="card-sub"><span class="c-badge">ANIME</span></div></div>
+
+  const animeCards = animeItems.map(a => {
+    const t = a.title_english || a.title || '?';
+    const img = a.images?.jpg?.image_url
+      ? `<img src="${a.images.jpg.image_url}" alt="${esc(t)}" decoding="async">`
+      : `<div class="hc-card-np">⛩️</div>`;
+    const safeT = esc(t).replace(/'/g,"\\'");
+    return `<div class="hc-card" onclick="hostPickAnime(${a.mal_id},'${safeT}')">
+      ${img}
+      <div class="hc-card-badge">ANI</div>
+      <div class="hc-card-title">${esc(t)}</div>
     </div>`;
   });
-  document.getElementById('sgrid').innerHTML=[...tmdbCards,...animeCards].join('');
+
+  res.innerHTML = [...tmdbCards, ...animeCards].join('');
 }
-function hideSPage(){document.getElementById('spage').classList.remove('on');document.getElementById('q').value='';switchPage(curPage);}
- 
-function toggleMenu(){
-  const sb=document.getElementById('sidebar'),b=document.getElementById('bd'),h=document.getElementById('hbtn');
-  const o=sb.classList.toggle('open');b.classList.toggle('open',o);h.classList.toggle('open',o);
+
+async function hostPickTMDB(id, type, title) {
+  const srcs = getSrc(id, type);
+  broadcastAndPlay({ id, type, title, srcs, mediaKind: 'tmdb' });
 }
-function closeMenu(){
-  document.getElementById('sidebar').classList.remove('open');
-  document.getElementById('bd').classList.remove('open');
-  document.getElementById('hbtn').classList.remove('open');
+
+async function hostPickAnime(malId, title) {
+  toast('Finding anime stream… 🔎');
+  const srcs = await getAnimeEmbedSrcs(malId, title);
+  broadcastAndPlay({ id: malId, type: 'anime', title, srcs, mediaKind: 'anime' });
 }
- 
-function sc(btn,d){btn.closest('.car-wrap').querySelector('.car').scrollBy({left:d*600,behavior:'smooth'});}
-function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3200);}
-window.addEventListener('scroll',()=>document.getElementById('totop').classList.toggle('show',scrollY>400));
-document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){closePlayer();closeM();closeMenu();}
-  if(e.key==='f'&&document.getElementById('player').classList.contains('open'))toggleFullscreen();
-});
- 
-switchPage('home');
+
+function broadcastAndPlay(payload) {
+  // Tell all viewers
+  channel.send({ type: 'broadcast', event: 'play_title', payload });
+  // Play locally for host too
+  loadPlayTitle(payload);
+  toast(`Now playing: ${payload.title} 🎬`);
+}
+
+// ── PLAY TITLE (host + viewers) ──
+function loadPlayTitle(payload) {
+  const { title, srcs } = payload;
+  currentSrcs = srcs;
+
+  document.getElementById('roomMovieTitle').textContent = title;
+  document.getElementById('roomPlaceholder').style.display = 'none';
+
+  // Show source bar
+  const srcBar  = document.getElementById('roomSrcBar');
+  const srcTabs = document.getElementById('roomSrcTabs');
+  srcBar.style.display = 'flex';
+  srcTabs.innerHTML = srcs.map((s, i) =>
+    `<button class="s-tab ${i===0?'active':''}" onclick="switchRoomSrc(${i})">${s.n}</button>`
+  ).join('');
+
+  loadRoomSrcByIdx(0);
+}
+
+function receivePlayTitle(payload) {
+  loadPlayTitle(payload);
+  addSystemMsg(`Host is now playing: ${payload.title}`);
+  toast(`Now playing: ${payload.title} 🎬`);
+}
+
+function switchRoomSrc(idx) {
+  loadRoomSrcByIdx(idx);
+  // If host, broadcast source change
+  if (isHost && channel) {
+    channel.send({ type: 'broadcast', event: 'change_source', payload: { idx, srcs: currentSrcs } });
+  }
+}
+
+function loadRoomSrc(idx, srcs) {
+  currentSrcs = srcs;
+  const srcTabs = document.getElementById('roomSrcTabs');
+  srcTabs.innerHTML = srcs.map((s, i) =>
+    `<button class="s-tab ${i===idx?'active':''}" onclick="switchRoomSrc(${i})">${s.n}</button>`
+  ).join('');
+  loadRoomSrcByIdx(idx);
+}
+
+function loadRoomSrcByIdx(idx) {
+  const s = currentSrcs[idx];
+  if (!s) return;
+
+  document.querySelectorAll('#roomSrcTabs .s-tab').forEach((b, j) => b.classList.toggle('active', j === idx));
+
+  const load  = document.getElementById('rpLoad');
+  const frame = document.getElementById('roomFrame');
+  const ph    = document.getElementById('roomPlaceholder');
+
+  ph.style.display    = 'none';
+  load.style.display  = 'flex';
+  frame.style.display = 'none';
+  frame.src = '';
+
+  setTimeout(() => {
+    frame.src = s.u;
+    frame.style.display = 'block';
+    frame.onload = () => { load.style.display = 'none'; };
+    setTimeout(() => { load.style.display = 'none'; }, 9000);
+  }, 80);
+
+  toast(`Loading ${s.n}… 🎬`);
+}
+
+// ── INIT ──
+// Check for ?room=XXXXXX in URL (for share links)
+(function checkURLRoom() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('room');
+  if (code && code.length === 6) {
+    document.getElementById('codeInput').value = code.toUpperCase();
+  }
+})();
