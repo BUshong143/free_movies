@@ -3,162 +3,320 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CineFy — Watch Together</title>
+<title>FreeMovies</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,300;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
 
 <nav>
   <button class="hamburger" id="hbtn" onclick="toggleMenu()">
     <span></span><span></span><span></span>
   </button>
-  <div class="logo" onclick="window.location.href='index.html'">
+  <div class="logo" onclick="goHome()">
     <span class="logo-c">Cine</span><span class="logo-dot"></span><span class="logo-w">Fy</span>
   </div>
-  <div class="nav-right" style="margin-left:auto;">
-    <div class="wt-nav-badge">
-      <span class="wt-nav-dot"></span>
-      Watch Together
+  <div class="nav-tabs">
+    <div class="nav-tab active" data-page="home" onclick="switchPage('home')">Home</div>
+    <div class="nav-tab" data-page="anime" onclick="switchPage('anime')">Anime</div>
+    <div class="nav-tab" data-page="tv" onclick="switchPage('tv')">TV Shows</div>
+    <div class="nav-tab" data-page="movies" onclick="switchPage('movies')">Movies</div>
+  </div>
+  <div class="nav-right">
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="text" id="q" placeholder="Search titles…" autocomplete="off">
     </div>
   </div>
 </nav>
 
-<!-- LOBBY (shown when not in a room) -->
-<div id="lobby">
-  <div class="lobby-bg">
-    <div class="lb-orb lb-orb1"></div>
-    <div class="lb-orb lb-orb2"></div>
-    <div class="lb-orb lb-orb3"></div>
-  </div>
-  <div class="lobby-card">
-    <div class="lb-icon">🎬</div>
-    <h1 class="lb-title">Watch Together</h1>
-    <p class="lb-sub">Create a room and invite friends to watch the same movie at the same time — with live chat.</p>
-
-    <div class="lb-nick-wrap">
-      <label class="lb-label">Your Display Name</label>
-      <input class="lb-input" id="nickInput" type="text" placeholder="e.g. bossgreggy" maxlength="20" autocomplete="off">
+<div id="bd" onclick="closeMenu()"></div>
+<aside id="sidebar">
+  <div class="sb-scroll">
+    <div class="sb-section">
+      <div class="sb-label">Browse</div>
+      <div class="sb-item active" data-sid="home" onclick="switchPage('home');closeMenu()"><span class="sb-icon">◈</span>Home</div>
+      <div class="sb-item" data-sid="anime" onclick="switchPage('anime');closeMenu()"><span class="sb-icon">⛩</span>Anime</div>
+      <div class="sb-item" data-sid="tv" onclick="switchPage('tv');closeMenu()"><span class="sb-icon">▣</span>TV Shows</div>
+      <div class="sb-item" data-sid="movies" onclick="switchPage('movies');closeMenu()"><span class="sb-icon">◉</span>Movies</div>
     </div>
+    <div class="sb-section">
+      <div class="sb-label">Movie Genres</div>
+      <div class="sb-item" onclick="goGenre(28,'Action');closeMenu()"><span class="sb-icon">💥</span>Action</div>
+      <div class="sb-item" onclick="goGenre(12,'Adventure');closeMenu()"><span class="sb-icon">🗺</span>Adventure</div>
+      <div class="sb-item" onclick="goGenre(35,'Comedy');closeMenu()"><span class="sb-icon">😄</span>Comedy</div>
+      <div class="sb-item" onclick="goGenre(80,'Crime');closeMenu()"><span class="sb-icon">🔫</span>Crime</div>
+      <div class="sb-item" onclick="goGenre(18,'Drama');closeMenu()"><span class="sb-icon">🎭</span>Drama</div>
+      <div class="sb-item" onclick="goGenre(14,'Fantasy');closeMenu()"><span class="sb-icon">🧙</span>Fantasy</div>
+      <div class="sb-item" onclick="goGenre(27,'Horror');closeMenu()"><span class="sb-icon">👻</span>Horror</div>
+      <div class="sb-item" onclick="goGenre(10749,'Romance');closeMenu()"><span class="sb-icon">❤️</span>Romance</div>
+      <div class="sb-item" onclick="goGenre(878,'Sci-Fi');closeMenu()"><span class="sb-icon">🚀</span>Sci-Fi</div>
+      <div class="sb-item" onclick="goGenre(53,'Thriller');closeMenu()"><span class="sb-icon">🕵</span>Thriller</div>
+    </div>
+    <div class="sb-section">
+      <div class="sb-label">Anime Genres</div>
+      <div class="sb-item" onclick="goAnimeGenre(1,'Action');closeMenu()"><span class="sb-icon">⚔️</span>Action</div>
+      <div class="sb-item" onclick="goAnimeGenre(4,'Comedy');closeMenu()"><span class="sb-icon">😂</span>Comedy</div>
+      <div class="sb-item" onclick="goAnimeGenre(8,'Drama');closeMenu()"><span class="sb-icon">🌸</span>Drama</div>
+      <div class="sb-item" onclick="goAnimeGenre(10,'Fantasy');closeMenu()"><span class="sb-icon">🐉</span>Fantasy</div>
+      <div class="sb-item" onclick="goAnimeGenre(14,'Horror');closeMenu()"><span class="sb-icon">🩸</span>Horror</div>
+      <div class="sb-item" onclick="goAnimeGenre(22,'Romance');closeMenu()"><span class="sb-icon">🌹</span>Romance</div>
+      <div class="sb-item" onclick="goAnimeGenre(24,'Sci-Fi');closeMenu()"><span class="sb-icon">🤖</span>Sci-Fi</div>
+    </div>
+  </div>
+  <div class="sb-footer">
+    Limited Movies Only!<br>
+    Built by <strong>bossgreggy</strong>
+  </div>
+</aside>
 
-    <div class="lb-divider"><span>Choose an option</span></div>
+<!-- HERO -->
+<div id="hero">
+  <div class="hero-media"><img id="himg" src="" alt=""></div>
+  <div class="hero-gradient"></div>
+  <div class="hero-content">
+    <div class="hero-eyebrow">
+      <div class="hero-pill-dot"></div>
+      <span class="hero-pill-text">Trending</span>
+      <span class="hero-num" id="hero-counter">01 / 06</span>
+    </div>
+    <h1 class="hero-t" id="htitle">Loading…</h1>
+    <div class="hero-meta">
+      <div class="hero-rating" id="hrating">⭐ —</div>
+      <span class="hero-tag" id="hyear"></span>
+      <span class="hero-tag" id="hgenre">Film</span>
+    </div>
+    <p class="hero-desc" id="hdesc"></p>
+    <div class="hero-btns">
+      <button class="btn-play" id="hplay">▶&nbsp; Watch Now</button>
+      <button class="btn-info" id="hinfo">More Info</button>
+    </div>
+  </div>
+  <div class="hero-dots" id="hdots"></div>
+</div>
 
-    <div class="lb-actions">
-      <button class="lb-btn-create" onclick="createRoom()">
-        <span class="lb-btn-icon">✦</span>
-        Create Room
-        <span class="lb-btn-sub">Get a room code to share</span>
-      </button>
-      <div class="lb-or">or</div>
-      <div class="lb-join-row">
-        <input class="lb-input lb-code-input" id="codeInput" type="text" placeholder="Enter room code…" maxlength="6" autocomplete="off" oninput="this.value=this.value.toUpperCase()">
-        <button class="lb-btn-join" onclick="joinRoom()">Join →</button>
+<!-- MAIN PAGES -->
+<div class="main">
+  <div class="page active" id="pg-home">
+    <div class="genre-row" id="gpills"></div>
+    <div class="sec">
+      <div class="sec-head">
+        <h2 class="sec-title"><span class="sec-num">01</span>Trending This Week</h2>
+      </div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="r-trending"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
       </div>
     </div>
+    <div class="sec">
+      <div class="sec-head">
+        <h2 class="sec-title"><span class="sec-num">02</span>Top Rated Movies</h2>
+      </div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="r-toprated"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="sec-head">
+        <h2 class="sec-title"><span class="sec-num">03</span>Now Playing in Cinemas</h2>
+      </div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="r-nowplaying"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="sec-head">
+        <h2 class="sec-title"><span class="sec-num">04</span>Popular on TV</h2>
+      </div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="r-tvpop"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="sec-head">
+        <h2 class="sec-title"><span class="sec-num">05</span>Top Anime This Season</h2>
+      </div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="r-anime"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
+    </div>
+    <div class="sec" id="xsec" style="display:none">
+      <div class="sec-head">
+        <h2 class="sec-title" id="xtitle">Results</h2>
+      </div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="r-extra"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
+    </div>
+  </div>
 
-    <div class="lb-err" id="lbErr"></div>
+  <div class="page" id="pg-anime">
+    <div class="sec" style="padding-top:32px">
+      <div class="sec-head"><h2 class="sec-title"><span class="sec-num">01</span>Top Airing Now</h2></div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="a-airing"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="sec-head"><h2 class="sec-title"><span class="sec-num">02</span>Most Popular</h2></div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="a-popular"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="sec-head"><h2 class="sec-title"><span class="sec-num">03</span>All-Time Top Rated</h2></div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="a-top"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="sec-head"><h2 class="sec-title"><span class="sec-num">04</span>Upcoming</h2></div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="a-upcoming"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
+    </div>
+    <div class="sec" id="ag-sec" style="display:none">
+      <div class="sec-head"><h2 class="sec-title" id="ag-title">Genre</h2></div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="a-genre"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
+    </div>
+  </div>
 
-    <div class="lb-info">
-      <span>🔒 Rooms auto-close when everyone leaves</span>
+  <div class="page" id="pg-tv">
+    <div class="sec" style="padding-top:32px">
+      <div class="sec-head"><h2 class="sec-title"><span class="sec-num">01</span>Popular TV Shows</h2></div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="t-popular"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="sec-head"><h2 class="sec-title"><span class="sec-num">02</span>Top Rated</h2></div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="t-toprated"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="sec-head"><h2 class="sec-title"><span class="sec-num">03</span>On Air Tonight</h2></div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="t-onair"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="pg-movies">
+    <div class="sec" style="padding-top:32px">
+      <div class="sec-head"><h2 class="sec-title"><span class="sec-num">01</span>Trending Movies</h2></div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="m-trending"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="sec-head"><h2 class="sec-title"><span class="sec-num">02</span>Top Rated</h2></div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="m-toprated"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="sec-head"><h2 class="sec-title"><span class="sec-num">03</span>Upcoming Releases</h2></div>
+      <div class="car-wrap">
+        <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
+        <div class="car" id="m-upcoming"></div>
+        <button class="car-btn rgt" onclick="sc(this,1)">›</button>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- ROOM VIEW -->
-<div id="roomView" style="display:none;">
+<!-- SEARCH PAGE -->
+<div id="spage">
+  <div class="s-head">Search results for: <span id="sq"></span></div>
+  <div class="sgrid" id="sgrid"></div>
+</div>
 
-  <!-- Room top bar -->
-  <div class="room-bar">
-    <button class="room-leave" onclick="leaveRoom()">← Leave</button>
-    <div class="room-info">
-      <span class="room-title" id="roomMovieTitle">No title selected</span>
-      <span class="room-code-badge">Room: <strong id="roomCodeDisplay">——</strong></span>
+<!-- FOOTER -->
+<footer class="site-footer">
+  <span>Limite Movies Only!</span>
+  <span>Built by <strong>bossgreggy</strong>
+</footer>
+
+<!-- MODAL -->
+<div id="moverlay" onclick="closeMBg(event)">
+  <div class="modal">
+    <div class="modal-pill"></div>
+    <div class="m-bd" id="mbd"></div>
+    <div class="m-body">
+      <div class="m-head">
+        <h2 class="m-title" id="mtitle">Loading…</h2>
+        <button class="m-x" onclick="closeM()">✕</button>
+      </div>
+      <div class="m-meta" id="mmeta"></div>
+      <p class="m-desc" id="mdesc"></p>
+      <div class="m-acts" id="macts"></div>
     </div>
-    <button class="room-copy" onclick="copyRoomCode()" title="Copy room code">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-      Copy Code
+  </div>
+</div>
+
+<!-- PLAYER -->
+<div id="player">
+  <div class="p-top">
+    <button class="p-back" onclick="closePlayer()">←</button>
+    <div class="p-title" id="ptitle">Now Playing</div>
+    <div class="src-tabs" id="stabs"></div>
+    <button class="p-fs" onclick="toggleFullscreen()" id="fsBtn" title="Toggle Fullscreen">
+      <svg id="fsIcon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 3h6v2H5v4H3V3zm12 0h6v6h-2V5h-4V3zM3 13h2v4h4v2H3v-6zm16 4h-4v2h6v-6h-2v4z"/>
+      </svg>
     </button>
   </div>
-
-  <div class="room-layout">
-
-    <!-- LEFT: Player + Source Picker -->
-    <div class="room-player-col">
-
-      <!-- Source tabs inside room -->
-      <div class="room-src-bar" id="roomSrcBar" style="display:none;">
-        <span class="rsb-label">Sources:</span>
-        <div class="rsb-tabs" id="roomSrcTabs"></div>
-      </div>
-
-      <!-- Player frame -->
-      <div class="room-frame-wrap" id="roomFrameWrap">
-        <div class="room-placeholder" id="roomPlaceholder">
-          <div class="rp-icon">🎬</div>
-          <div class="rp-text">Waiting for host to pick a title…</div>
-          <div class="rp-sub" id="rpSubText"></div>
-        </div>
-        <div class="p-load" id="rpLoad" style="display:none;">
-          <div class="spin-ring"></div>
-          <div class="p-load-txt">Loading Stream…</div>
-        </div>
-        <iframe id="roomFrame" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowfullscreen referrerpolicy="origin" style="display:none;"></iframe>
-      </div>
-
-      <!-- Host controls -->
-      <div class="host-controls" id="hostControls" style="display:none;">
-        <div class="hc-label">🎮 You are the Host — pick a title to watch</div>
-        <div class="hc-search-wrap">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-          <input type="text" id="hcSearch" placeholder="Search a movie, show, or anime…" autocomplete="off">
-        </div>
-        <div class="hc-results" id="hcResults"></div>
-      </div>
-
-      <!-- Viewer notice -->
-      <div class="viewer-notice" id="viewerNotice" style="display:none;">
-        <span>👁 You are a viewer — the host controls playback</span>
-      </div>
-
+  <div class="p-body" id="playerBody">
+    <div class="p-load" id="pload">
+      <div class="spin-ring"></div>
+      <div class="p-load-txt">Loading Stream…</div>
     </div>
-
-    <!-- RIGHT: Members + Chat -->
-    <div class="room-chat-col">
-
-      <!-- Members -->
-      <div class="chat-section members-section">
-        <div class="cs-head">
-          <span class="cs-title">Members</span>
-          <span class="member-count" id="memberCount">0</span>
-        </div>
-        <div class="members-list" id="membersList"></div>
-      </div>
-
-      <!-- Chat -->
-      <div class="chat-section chat-section-main">
-        <div class="cs-head">
-          <span class="cs-title">Live Chat</span>
-          <span class="chat-live-dot"></span>
-        </div>
-        <div class="chat-messages" id="chatMessages">
-          <div class="chat-system">Welcome to the room! 👋</div>
-        </div>
-        <div class="chat-input-wrap">
-          <input class="chat-input" id="chatInput" type="text" placeholder="Say something…" maxlength="200" autocomplete="off">
-          <button class="chat-send" onclick="sendChat()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-          </button>
-        </div>
-      </div>
-
-    </div>
+    <iframe id="pFrame" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowfullscreen referrerpolicy="origin"></iframe>
+  </div>
+  <div class="p-bar">
+    <span>⚡ Video not loading? Try another source above.</span>
+    <a id="otab" href="#" target="_blank" rel="noopener">Open in New Tab ↗</a>
   </div>
 </div>
 
 <div id="toast"></div>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<button id="totop" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+</script>
 <script src="script.js"></script>
 </body>
 </html>
