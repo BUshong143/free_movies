@@ -242,6 +242,27 @@ nav{
   cursor:pointer;transition:all .2s;letter-spacing:.2px;
 }
 .btn-play:hover{background:#f7c548;transform:translateY(-1px);box-shadow:0 8px 24px rgba(240,180,41,0.35);}
+
+/* ── WATCH TOGETHER MODAL BUTTON ── */
+.btn-wt{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(79,142,247,0.12);
+  color:var(--blue);
+  border:1px solid rgba(79,142,247,0.3);
+  border-radius:14px;
+  padding:13px 22px;
+  font-family:'Poppins',sans-serif;font-size:13px;font-weight:600;
+  cursor:pointer;transition:all .2s;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  white-space:nowrap;
+}
+.btn-wt:hover{
+  background:rgba(79,142,247,0.22);
+  border-color:var(--blue);
+  transform:translateY(-1px);
+  box-shadow:0 8px 24px rgba(79,142,247,0.2);
+}
+
 .btn-info{
   display:flex;align-items:center;gap:8px;
   background:rgba(255,255,255,0.1);color:var(--text);
@@ -613,4 +634,7 @@ nav{
   .genre-row{padding-top:16px;}
   .site-footer{padding:16px 14px;flex-direction:column;gap:6px;text-align:center;}
   .hero-dots{left:18px;}
+  /* Stack modal buttons on mobile */
+  .m-acts{flex-direction:column;}
+  .btn-play,.btn-wt,.btn-info{justify-content:center;}
 }
