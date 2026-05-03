@@ -3,12 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FreeMovies</title>
+<title>CineFy</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,300;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
 
 <nav>
   <button class="hamburger" id="hbtn" onclick="toggleMenu()">
@@ -53,26 +52,26 @@
     </div>
     <div class="sb-section">
       <div class="sb-label">Movie Genres</div>
-      <div class="sb-item" onclick="goGenre(28,'Action');closeMenu()"><span class="sb-icon">💥</span>Action</div>
-      <div class="sb-item" onclick="goGenre(12,'Adventure');closeMenu()"><span class="sb-icon">🗺</span>Adventure</div>
-      <div class="sb-item" onclick="goGenre(35,'Comedy');closeMenu()"><span class="sb-icon">😄</span>Comedy</div>
-      <div class="sb-item" onclick="goGenre(80,'Crime');closeMenu()"><span class="sb-icon">🔫</span>Crime</div>
-      <div class="sb-item" onclick="goGenre(18,'Drama');closeMenu()"><span class="sb-icon">🎭</span>Drama</div>
-      <div class="sb-item" onclick="goGenre(14,'Fantasy');closeMenu()"><span class="sb-icon">🧙</span>Fantasy</div>
-      <div class="sb-item" onclick="goGenre(27,'Horror');closeMenu()"><span class="sb-icon">👻</span>Horror</div>
-      <div class="sb-item" onclick="goGenre(10749,'Romance');closeMenu()"><span class="sb-icon">❤️</span>Romance</div>
-      <div class="sb-item" onclick="goGenre(878,'Sci-Fi');closeMenu()"><span class="sb-icon">🚀</span>Sci-Fi</div>
-      <div class="sb-item" onclick="goGenre(53,'Thriller');closeMenu()"><span class="sb-icon">🕵</span>Thriller</div>
+      <div class="sb-item sb-genre-item" data-gid="28" data-name="Action"><span class="sb-icon">💥</span>Action</div>
+      <div class="sb-item sb-genre-item" data-gid="12" data-name="Adventure"><span class="sb-icon">🗺</span>Adventure</div>
+      <div class="sb-item sb-genre-item" data-gid="35" data-name="Comedy"><span class="sb-icon">😄</span>Comedy</div>
+      <div class="sb-item sb-genre-item" data-gid="80" data-name="Crime"><span class="sb-icon">🔫</span>Crime</div>
+      <div class="sb-item sb-genre-item" data-gid="18" data-name="Drama"><span class="sb-icon">🎭</span>Drama</div>
+      <div class="sb-item sb-genre-item" data-gid="14" data-name="Fantasy"><span class="sb-icon">🧙</span>Fantasy</div>
+      <div class="sb-item sb-genre-item" data-gid="27" data-name="Horror"><span class="sb-icon">👻</span>Horror</div>
+      <div class="sb-item sb-genre-item" data-gid="10749" data-name="Romance"><span class="sb-icon">❤️</span>Romance</div>
+      <div class="sb-item sb-genre-item" data-gid="878" data-name="Sci-Fi"><span class="sb-icon">🚀</span>Sci-Fi</div>
+      <div class="sb-item sb-genre-item" data-gid="53" data-name="Thriller"><span class="sb-icon">🕵</span>Thriller</div>
     </div>
     <div class="sb-section">
       <div class="sb-label">Anime Genres</div>
-      <div class="sb-item" onclick="goAnimeGenre(1,'Action');closeMenu()"><span class="sb-icon">⚔️</span>Action</div>
-      <div class="sb-item" onclick="goAnimeGenre(4,'Comedy');closeMenu()"><span class="sb-icon">😂</span>Comedy</div>
-      <div class="sb-item" onclick="goAnimeGenre(8,'Drama');closeMenu()"><span class="sb-icon">🌸</span>Drama</div>
-      <div class="sb-item" onclick="goAnimeGenre(10,'Fantasy');closeMenu()"><span class="sb-icon">🐉</span>Fantasy</div>
-      <div class="sb-item" onclick="goAnimeGenre(14,'Horror');closeMenu()"><span class="sb-icon">🩸</span>Horror</div>
-      <div class="sb-item" onclick="goAnimeGenre(22,'Romance');closeMenu()"><span class="sb-icon">🌹</span>Romance</div>
-      <div class="sb-item" onclick="goAnimeGenre(24,'Sci-Fi');closeMenu()"><span class="sb-icon">🤖</span>Sci-Fi</div>
+      <div class="sb-item sb-anime-genre-item" data-gid="1" data-name="Action"><span class="sb-icon">⚔️</span>Action</div>
+      <div class="sb-item sb-anime-genre-item" data-gid="4" data-name="Comedy"><span class="sb-icon">😂</span>Comedy</div>
+      <div class="sb-item sb-anime-genre-item" data-gid="8" data-name="Drama"><span class="sb-icon">🌸</span>Drama</div>
+      <div class="sb-item sb-anime-genre-item" data-gid="10" data-name="Fantasy"><span class="sb-icon">🐉</span>Fantasy</div>
+      <div class="sb-item sb-anime-genre-item" data-gid="14" data-name="Horror"><span class="sb-icon">🩸</span>Horror</div>
+      <div class="sb-item sb-anime-genre-item" data-gid="22" data-name="Romance"><span class="sb-icon">🌹</span>Romance</div>
+      <div class="sb-item sb-anime-genre-item" data-gid="24" data-name="Sci-Fi"><span class="sb-icon">🤖</span>Sci-Fi</div>
     </div>
   </div>
   <div class="sb-footer">
@@ -111,9 +110,7 @@
   <div class="page active" id="pg-home">
     <div class="genre-row" id="gpills"></div>
     <div class="sec">
-      <div class="sec-head">
-        <h2 class="sec-title"><span class="sec-num">01</span>Trending This Week</h2>
-      </div>
+      <div class="sec-head"><h2 class="sec-title"><span class="sec-num">01</span>Trending This Week</h2></div>
       <div class="car-wrap">
         <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
         <div class="car" id="r-trending"></div>
@@ -121,9 +118,7 @@
       </div>
     </div>
     <div class="sec">
-      <div class="sec-head">
-        <h2 class="sec-title"><span class="sec-num">02</span>Top Rated Movies</h2>
-      </div>
+      <div class="sec-head"><h2 class="sec-title"><span class="sec-num">02</span>Top Rated Movies</h2></div>
       <div class="car-wrap">
         <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
         <div class="car" id="r-toprated"></div>
@@ -131,9 +126,7 @@
       </div>
     </div>
     <div class="sec">
-      <div class="sec-head">
-        <h2 class="sec-title"><span class="sec-num">03</span>Now Playing in Cinemas</h2>
-      </div>
+      <div class="sec-head"><h2 class="sec-title"><span class="sec-num">03</span>Now Playing in Cinemas</h2></div>
       <div class="car-wrap">
         <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
         <div class="car" id="r-nowplaying"></div>
@@ -141,9 +134,7 @@
       </div>
     </div>
     <div class="sec">
-      <div class="sec-head">
-        <h2 class="sec-title"><span class="sec-num">04</span>Popular on TV</h2>
-      </div>
+      <div class="sec-head"><h2 class="sec-title"><span class="sec-num">04</span>Popular on TV</h2></div>
       <div class="car-wrap">
         <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
         <div class="car" id="r-tvpop"></div>
@@ -151,9 +142,7 @@
       </div>
     </div>
     <div class="sec">
-      <div class="sec-head">
-        <h2 class="sec-title"><span class="sec-num">05</span>Top Anime This Season</h2>
-      </div>
+      <div class="sec-head"><h2 class="sec-title"><span class="sec-num">05</span>Top Anime This Season</h2></div>
       <div class="car-wrap">
         <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
         <div class="car" id="r-anime"></div>
@@ -161,9 +150,7 @@
       </div>
     </div>
     <div class="sec" id="xsec" style="display:none">
-      <div class="sec-head">
-        <h2 class="sec-title" id="xtitle">Results</h2>
-      </div>
+      <div class="sec-head"><h2 class="sec-title" id="xtitle">Results</h2></div>
       <div class="car-wrap">
         <button class="car-btn lft" onclick="sc(this,-1)">‹</button>
         <div class="car" id="r-extra"></div>
