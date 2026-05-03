@@ -210,6 +210,12 @@ async function enterRoom() {
       if (isHost) {
         showHostControls();
         addSystemMsg(`You created this room. Share code: ${roomCode}`);
+        // Auto-load title if coming from main app
+        if (window._autoPlay) {
+          const { title, id, type } = window._autoPlay;
+          window._autoPlay = null;
+          setTimeout(() => hostPickTMDB(id, type, title), 600);
+        }
       } else {
         showViewerNotice();
         addSystemMsg(`You joined room ${roomCode}`);
@@ -246,10 +252,6 @@ function broadcastPlaybackCmd(cmd) {
   });
 }
 
-// Apply play/pause by directly manipulating the iframe src.
-// postMessage doesn't work on cross-origin embed players (VidSrc, etc.).
-// Pause = blank the src (kills audio/video immediately).
-// Play  = restore the src URL (resumes stream from current source).
 function applyPlaybackCmd(cmd, senderNick) {
   const frame = document.getElementById('roomFrame');
   const load  = document.getElementById('rpLoad');
@@ -257,13 +259,11 @@ function applyPlaybackCmd(cmd, senderNick) {
 
   if (cmd === 'pause') {
     isPaused = true;
-    // Save current src before blanking so we can restore it on play
     if (frame.src && frame.src !== window.location.href) {
       frame.dataset.pausedSrc = frame.src;
     }
     frame.src = '';
     if (load) load.style.display = 'none';
-    // Show a paused overlay
     showPausedOverlay(senderNick);
   } else if (cmd === 'play') {
     isPaused = false;
@@ -277,15 +277,11 @@ function applyPlaybackCmd(cmd, senderNick) {
     }
   }
 
-  // Update sync status bar
   const statusText = document.getElementById('syncStatusText');
   if (statusText) {
-    statusText.textContent = cmd === 'play'
-      ? `▶ Playing`
-      : `⏸ Paused`;
+    statusText.textContent = cmd === 'play' ? `▶ Playing` : `⏸ Paused`;
   }
 
-  // Notify in chat
   addSyncEventMsg(cmd === 'play'
     ? `▶ ${senderNick} resumed playback`
     : `⏸ ${senderNick} paused playback`
@@ -405,7 +401,6 @@ function sendChat(inputId) {
   input.value = '';
 }
 
-// Wire up both send buttons
 document.getElementById('chatSendBtn').addEventListener('click', () => sendChat('chatInput'));
 document.getElementById('chatSendMobile').addEventListener('click', () => sendChat('chatInputMobile'));
 
@@ -426,7 +421,6 @@ function appendChat(nick, text, ts, isMe) {
     <div class="chat-msg-text">${esc(text)}</div>
   </div>`;
 
-  // Append to both panels
   [document.getElementById('chatMessages'), document.getElementById('chatMessagesMobile')].forEach(box => {
     if (!box) return;
     box.insertAdjacentHTML('beforeend', html);
@@ -451,7 +445,6 @@ function openChatDrawer() {
   document.getElementById('chatDrawer').classList.add('open');
   document.getElementById('drawerOverlay').classList.add('open');
   document.body.style.overflow = 'hidden';
-  // Scroll to bottom
   setTimeout(() => {
     const m = document.getElementById('chatMessagesMobile');
     if (m) m.scrollTop = m.scrollHeight;
@@ -480,7 +473,6 @@ document.getElementById('fabChat').addEventListener('click', openChatDrawer);
 document.getElementById('drawerClose').addEventListener('click', closeChatDrawer);
 document.getElementById('drawerOverlay').addEventListener('click', closeChatDrawer);
 
-// Swipe down to close drawer
 let touchStartY = 0;
 document.getElementById('drawerHandle').addEventListener('touchstart', e => {
   touchStartY = e.touches[0].clientY;
@@ -507,7 +499,6 @@ function showHostControls() {
 function showViewerNotice() {
   document.getElementById('viewerNotice').style.display = 'block';
   document.getElementById('hostControls').style.display = 'none';
-  // Non-hosts can still see sync bar to send play/pause
   document.getElementById('syncBar').style.display = 'flex';
 }
 
@@ -553,7 +544,6 @@ async function hostSearch(q) {
       })
     ].join('');
 
-    // Attach click events — no inline onclick
     res.querySelectorAll('.hc-card[data-id]').forEach(card => {
       card.addEventListener('click', () => hostPickTMDB(card.dataset.id, card.dataset.type, card.dataset.title));
     });
@@ -656,15 +646,30 @@ function loadRoomSrcByIdx(idx) {
   toast(`Loading ${s.n}… 🎬`);
 }
 
-// ── INIT: URL room code ──
+// ── INIT: URL room code + auto-title from main app ──
 (function checkURLRoom() {
   const params = new URLSearchParams(window.location.search);
+
+  // Join by room code
   const code = params.get('room');
   if (code && code.length === 6) {
     document.getElementById('codeInput').value = code.toUpperCase();
   }
+
+  // Auto-title: came from "Watch Together" button on a movie card
+  const autoTitle = params.get('autotitle');
+  const autoId    = params.get('autoid');
+  const autoType  = params.get('autotype');
+  if (autoTitle && autoId && autoType) {
+    window._autoPlay = { title: decodeURIComponent(autoTitle), id: autoId, type: autoType };
+    // Show hint in lobby
+    const sub = document.querySelector('.lb-sub');
+    if (sub) {
+      sub.innerHTML = `Ready to watch <strong style="color:var(--accent)">${decodeURIComponent(autoTitle)}</strong> together! Create a room and share the code with friends.`;
+    }
+  }
 })();
 
-// Hamburger nav (shared with main app)
+// Hamburger nav
 const hbtn = document.getElementById('hbtn');
 if (hbtn) hbtn.addEventListener('click', () => hbtn.classList.toggle('open'));
