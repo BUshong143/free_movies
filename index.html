@@ -24,6 +24,15 @@
     <div class="nav-tab" data-page="movies" onclick="switchPage('movies')">Movies</div>
   </div>
   <div class="nav-right">
+    <a class="wt-btn" href="watch-together.html" title="Watch Together">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+      Watch Together
+    </a>
     <div class="search-wrap">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       <input type="text" id="q" placeholder="Search titles…" autocomplete="off">
@@ -40,6 +49,7 @@
       <div class="sb-item" data-sid="anime" onclick="switchPage('anime');closeMenu()"><span class="sb-icon">⛩</span>Anime</div>
       <div class="sb-item" data-sid="tv" onclick="switchPage('tv');closeMenu()"><span class="sb-icon">▣</span>TV Shows</div>
       <div class="sb-item" data-sid="movies" onclick="switchPage('movies');closeMenu()"><span class="sb-icon">◉</span>Movies</div>
+      <a class="sb-item" href="watch-together.html" style="text-decoration:none;color:var(--accent);"><span class="sb-icon">👥</span>Watch Together</a>
     </div>
     <div class="sb-section">
       <div class="sb-label">Movie Genres</div>
@@ -268,8 +278,8 @@
 
 <!-- FOOTER -->
 <footer class="site-footer">
-  <span>Limite Movies Only!</span>
-  <span>Built by <strong>bossgreggy</strong>
+  <span>Limited Movies Only!</span>
+  <span>Built by <strong>bossgreggy</strong></span>
 </footer>
 
 <!-- MODAL -->
@@ -316,7 +326,6 @@
 
 <div id="toast"></div>
 <button id="totop" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
-</script>
 <script src="script.js"></script>
 </body>
 </html>
