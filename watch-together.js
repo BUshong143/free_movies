@@ -27,17 +27,19 @@ const SOURCES = [
 ];
 
 // App state
-let myNick     = '';
-let myUserId   = crypto.randomUUID();
-let roomCode   = '';
-let isHost     = false;
-let channel    = null;
-let members    = {};        // { userId: { nick, isHost } }
+let myNick      = '';
+let myUserId    = crypto.randomUUID();
+let roomCode    = '';
+let isHost      = false;
+let channel     = null;
+let members     = {};        // { userId: { nick, isHost } }
 let currentSrcs = [];
-let hcTimer    = null;
-let unreadCount = 0;        // mobile unread badge
+let currentSrcIdx = 0;       // track which source is active
+let isPaused    = false;     // track paused state
+let hcTimer     = null;
+let unreadCount = 0;
 let chatDrawerOpen = false;
-let isMobile   = () => window.innerWidth <= 768;
+let isMobile    = () => window.innerWidth <= 768;
 
 // ── UTILITIES ──
 function esc(s) {
@@ -244,32 +246,84 @@ function broadcastPlaybackCmd(cmd) {
   });
 }
 
-// Apply play/pause to the iframe by reloading src (postMessage approach where possible)
+// Apply play/pause by directly manipulating the iframe src.
+// postMessage doesn't work on cross-origin embed players (VidSrc, etc.).
+// Pause = blank the src (kills audio/video immediately).
+// Play  = restore the src URL (resumes stream from current source).
 function applyPlaybackCmd(cmd, senderNick) {
   const frame = document.getElementById('roomFrame');
-  if (!frame || frame.style.display === 'none') return;
+  const load  = document.getElementById('rpLoad');
+  if (!frame) return;
 
-  // Try postMessage to player (works with some embeds)
-  try {
-    frame.contentWindow.postMessage({ action: cmd }, '*');
-  } catch(e) {}
+  if (cmd === 'pause') {
+    isPaused = true;
+    // Save current src before blanking so we can restore it on play
+    if (frame.src && frame.src !== window.location.href) {
+      frame.dataset.pausedSrc = frame.src;
+    }
+    frame.src = '';
+    if (load) load.style.display = 'none';
+    // Show a paused overlay
+    showPausedOverlay(senderNick);
+  } else if (cmd === 'play') {
+    isPaused = false;
+    hidePausedOverlay();
+    const restoreSrc = frame.dataset.pausedSrc || (currentSrcs[currentSrcIdx]?.u);
+    if (restoreSrc) {
+      if (load) load.style.display = 'flex';
+      frame.src = restoreSrc;
+      frame.onload = () => { if (load) load.style.display = 'none'; };
+      setTimeout(() => { if (load) load.style.display = 'none'; }, 9000);
+    }
+  }
 
-  // Visual feedback in sync status
+  // Update sync status bar
   const statusText = document.getElementById('syncStatusText');
   if (statusText) {
     statusText.textContent = cmd === 'play'
-      ? `▶ Playing (${senderNick})`
-      : `⏸ Paused (${senderNick})`;
-    setTimeout(() => { statusText.textContent = 'Synced'; }, 4000);
+      ? `▶ Playing`
+      : `⏸ Paused`;
   }
 
-  // Add sync event to both chat panels
+  // Notify in chat
   addSyncEventMsg(cmd === 'play'
-    ? `▶ ${senderNick} sent Play signal`
-    : `⏸ ${senderNick} sent Pause signal`
+    ? `▶ ${senderNick} resumed playback`
+    : `⏸ ${senderNick} paused playback`
   );
+  toast(cmd === 'play'
+    ? `▶ ${senderNick} resumed playback`
+    : `⏸ ${senderNick} paused playback`
+  );
+}
 
-  toast(cmd === 'play' ? `▶ ${senderNick} pressed Play` : `⏸ ${senderNick} pressed Pause`);
+// ── PAUSED OVERLAY ──
+function showPausedOverlay(nick) {
+  let ov = document.getElementById('pausedOverlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'pausedOverlay';
+    ov.style.cssText = `
+      position:absolute;inset:0;z-index:50;
+      background:rgba(10,10,15,0.82);
+      backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      gap:12px;pointer-events:none;
+    `;
+    ov.innerHTML = `
+      <div style="font-size:52px;line-height:1">⏸</div>
+      <div style="font-size:15px;font-weight:700;color:#f5f5f7">Paused</div>
+      <div id="pausedBy" style="font-size:12px;color:rgba(245,245,247,0.5)"></div>
+    `;
+    document.getElementById('roomFrameWrap').appendChild(ov);
+  }
+  ov.style.display = 'flex';
+  const pb = document.getElementById('pausedBy');
+  if (pb) pb.textContent = `by ${nick}`;
+}
+
+function hidePausedOverlay() {
+  const ov = document.getElementById('pausedOverlay');
+  if (ov) ov.style.display = 'none';
 }
 
 function addSyncEventMsg(text) {
